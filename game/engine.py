@@ -5,23 +5,22 @@
 
 from .gameutil import card_show
 import numpy as np
+from typing import List, Tuple
 
 ############################################
 #                 游戏类                   #
 ############################################                   
 class Game(object):
-    
-    def __init__(self, agents):
-
+    def __init__(self, agents: List['Agent']):
         # 初始化players
         self.players = []
-        self.players.extend(agents)
-        self.moves = ['start']
+        for p in agents:
+            p.set_game(self)
+            self.players.append(p)
         self.game_reset()
         
     # 游戏环境重置
     def game_reset(self):
-
         #初始化一副扑克牌类
         cards = Cards()
         #洗牌
@@ -36,9 +35,7 @@ class Game(object):
         self.players[0].cards_left = p1_cards
         self.players[1].cards_left = p2_cards
         self.players[2].cards_left = p3_cards
-        self.players[0].cards_out = []
-        self.players[1].cards_out = []
-        self.players[2].cards_out = []    
+        self.cards_out = []
 
         #play相关参数
         self.end = False    # 游戏是否结束
@@ -46,25 +43,17 @@ class Game(object):
         self.playround = 1  # 回合数
         self.index = 0  # 当前玩家的id，0代表地主，1代表地主下家，2代表地主上家
         self.yaobuqis = []
-        self.moves = ['start']
-    
-    #返回下次出牌列表
-    def get_next_moves(self):
-        next_move_types, next_moves = self.players[self.index].get_moves(self.last_move_type, self.last_move)
-        return next_move_types, next_moves
     
     #游戏进行    
     def step(self):
-        cards_out = [player.cards_out for player in self.players]
-        state = State(self.index,self.players[self.index].cards_left,cards_out,self.last_move_type,self.last_move,self.moves)
+        state = State(self.index, self.players[self.index].cards_left, self.cards_out, self.last_move_type, self.last_move)
         self.last_move_type, self.last_move, self.end, self.yaobuqi = self.players[self.index].step(state)
-        self.moves.append(self.last_move)
         if self.yaobuqi:
             self.yaobuqis.append(self.index)
         else:
             self.yaobuqis = []
         #都要不起
-        if len(self.yaobuqis) == 2:
+        if len(self.yaobuqis) == len(self.players)-1:
             self.yaobuqis = []
             self.last_move_type = self.last_move = "start"
 
@@ -74,13 +63,11 @@ class Game(object):
 
         self.index = self.index + 1
         #一轮结束
-        if self.index > 2:
+        if self.index >= len(self.players):
             #playrecords.show("=============Round " + str(playround) + " End=============")
             self.playround = self.playround + 1
             #playrecords.show("=============Round " + str(playround) + " Start=============")
             self.index = 0  
-            
-        self.get_next_moves()   
 
         return winner
 
@@ -97,18 +84,9 @@ class Card(object):
     扑克牌类
     """
     def __init__(self, card_type):
-        self.card_type = card_type  # '牌面数字-花色-大小排名' 举例来说，红桃A的card_type为'1-a-12'
+        self.card_type = card_type  # '牌面数字-花色-大小排名' 举例来说，红桃A的card_type为'1-♥-12'
         self.name = self.card_type.split('-')[0] # 名称,即牌面数字
-        color = self.card_type.split('-')[1] # 花色，'abcd'对应“红黑梅方”
-        # 花色对应的unicode字符
-        if color == "a":
-            self.color = u'\u2660'
-        elif color == "b":
-            self.color = u'\u2665'
-        elif color == "c":
-            self.color = u'\u2663'
-        else:
-            self.color = u'\u2666'
+        self.color = self.card_type.split('-')[1] # 花色
         # 大小
         self.rank = int(self.card_type.split('-')[2])
 
@@ -119,26 +97,30 @@ class Card(object):
         else:
             return False
 
+    def __str__(self):
+        return self.name+self.color
+    
+
 class Cards(object):
     """
-    一副扑克牌类,54张排,abcd四种花色,小王14-a,大王15-a
+    一副扑克牌类,54张牌,小王14-♠,大王15-♠
     """
     def __init__(self):
         #初始化扑克牌类型
-        self.cards_type = ['1-a-12', '1-b-12','1-c-12','1-d-12',
-                           '2-a-13', '2-b-13','2-c-13','2-d-13',
-                           '3-a-1', '3-b-1','3-c-1','3-d-1',
-                           '4-a-2', '4-b-2','4-c-2','4-d-2',
-                           '5-a-3', '5-b-3','5-c-3','5-d-3',
-                           '6-a-4', '6-b-4','6-c-4','6-d-4',
-                           '7-a-5', '7-b-5','7-c-5','7-d-5',
-                           '8-a-6', '8-b-6','8-c-6','8-d-6',
-                           '9-a-7', '9-b-7','9-c-7','9-d-7',
-                           '10-a-8', '10-b-8','10-c-8','10-d-8',
-                           '11-a-9', '11-b-9','11-c-9','11-d-9',
-                           '12-a-10', '12-b-10','12-c-10','12-d-10',
-                           '13-a-11', '13-b-11','13-c-11','13-d-11',
-                           '14-a-14', '15-a-15']
+        self.cards_type = ['1-♠-12', '1-♥-12','1-♣-12','1-♦-12',
+                           '2-♠-13', '2-♥-13','2-♣-13','2-♦-13',
+                           '3-♠-1', '3-♥-1','3-♣-1','3-♦-1',
+                           '4-♠-2', '4-♥-2','4-♣-2','4-♦-2',
+                           '5-♠-3', '5-♥-3','5-♣-3','5-♦-3',
+                           '6-♠-4', '6-♥-4','6-♣-4','6-♦-4',
+                           '7-♠-5', '7-♥-5','7-♣-5','7-♦-5',
+                           '8-♠-6', '8-♥-6','8-♣-6','8-♦-6',
+                           '9-♠-7', '9-♥-7','9-♣-7','9-♦-7',
+                           '10-♠-8', '10-♥-8','10-♣-8','10-♦-8',
+                           '11-♠-9', '11-♥-9','11-♣-9','11-♦-9',
+                           '12-♠-10', '12-♥-10','12-♣-10','12-♦-10',
+                           '13-♠-11', '13-♥-11','13-♣-11','13-♦-11',
+                           '14-♠-14', '15-♠-15']
         #初始化扑克牌类                  
         self.cards = self.get_cards()
 
@@ -295,7 +277,7 @@ class Moves(object):
         self.shunzi.extend(shunzi_sub)
                 
     #获取下次出牌列表
-    def get_next_moves(self, last_move_type, last_move): 
+    def get_next_moves(self, last_move_type, last_move)-> (List[str], List[List[Card]]): 
         #没有last,全加上,除了bomb最后加
         if last_move_type == "start":
             moves_types = ["dan", "dui", "san", "san_dai_yi", "san_dai_er", "shunzi"]
@@ -388,14 +370,16 @@ class Agent(object):
     """
     玩家类,所有模型都应继承此类并重写choose方法
     """
-    def __init__(self, player_id,game=None):
+    def __init__(self, player_id):
         self.player_id = player_id  # 0代表地主，1代表地主下家，2代表地主上家
         self.cards_left = []
-        self.game = game
         self.cards_out = []
 
+    def set_game(self, game):
+        self.game = game
+
     # 模型选择如何出牌
-    def choose(self,state):
+    def choose(self, state: 'State') -> (str, List[Card]):
         return None, None
         
     # 选牌，返回下一步可能出的所有牌的类型 具体牌内容
@@ -406,47 +390,51 @@ class Agent(object):
         self.total_moves.get_total_moves(self.cards_left)
         #获取下次出牌列表
         self.next_move_types, self.next_moves = self.total_moves.get_next_moves(last_move_type, last_move)        
-        
+
         return self.next_move_types, self.next_moves
     
     # 进行一步之后的公共操作
-    def common_step(self, last_move_type, last_move):
+    def __common_step(self, last_move_type, last_move):
         #移除出掉的牌
         if self.next_move_type in ["yaobuqi", "buyao"]:
-            self.next_move = self.next_move_type
-        else:
-            for i in self.next_move:
-               self.cards_left.remove(i) 
+            self.next_move = []
+        for i in self.next_move:
+            self.cards_left.remove(i) 
+
         #是否牌局结束
         end = False
         if len(self.cards_left) == 0:
             end = True
-        #展示
-        #self.show("Player " + str(self.player_id))  
+
         #要不起&不要
-        yaobuqi = False
         if self.next_move_type in ["yaobuqi","buyao"]:
             yaobuqi = True
-            self.next_move_type = last_move_type
-            self.next_move = last_move
-        return self.next_move_type, self.next_move, end, yaobuqi
+            next_move_type = last_move_type
+            next_move = last_move
+        else:
+            yaobuqi = False
+            next_move_type = self.next_move_type
+            next_move = self.next_move
+        return next_move_type, next_move, end, yaobuqi
 
     # 出牌
     def step(self, state):
         #在next_moves中选择出牌方法
         self.next_move_type, self.next_move = self.choose(state)
-        self.cards_out.append(self.next_move)
-        return self.common_step(state.last_move_type, state.last_move)
+        self.game.cards_out.append( (self.player_id, self.next_move_type, self.next_move) )
+        return self.__common_step(state.last_move_type, state.last_move)
+
 
 ############################################
 #              状态相关类                   #
 ############################################        
 class State(object):
-    def __init__(self, player_id, cards_left, cards_out, last_move_type, last_move, moves):
+    def __init__(self, player_id: int, cards_left: List[Card], 
+                       cards_out: List[Tuple[int, str, List[Card]]], 
+                       last_move_type: str, 
+                       last_move: List[Card]):
         self.player_id = player_id
         self.cards_left = cards_left
         self.cards_out = cards_out
         self.last_move_type = last_move_type
         self.last_move = last_move
-        self.moves = moves
-
