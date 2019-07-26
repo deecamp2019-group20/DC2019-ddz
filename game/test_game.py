@@ -2,7 +2,6 @@ import sys
 sys.path.append('../')
 
 from DouDiZhu.game.engine import *
-from DouDiZhu.game.gameutil import card_show
 
 class RandomModel(Agent):
     
