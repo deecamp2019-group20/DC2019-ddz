@@ -4,7 +4,7 @@
 - gameutil.py 相关工具类
 
 ### 使用方法示例
-```Python3
+```Python
 from.game.engine import Agent
 
 # 自己的模型继承Agent类并重写choose方法
@@ -12,18 +12,22 @@ class MyModel(Agent):
     
     def choose(self,state):
 		'''
-			模型根据state选择出牌的方法
+			模型根据当前状态选择出牌的方法
+
+            参数说明：
 			state.player_id 待出牌玩家的id，0代表地主，1代表地主下家，2代表地主上家
 			self.cards_left 待出牌玩家当前剩余手牌
 			self.cards_out 一个三维list，第一维按序存储地主打出的牌，第二维按序存储地主下家打出的牌，第三维按序存储地主上家打出的牌
 			self.last_move_type 待出牌玩家出的牌的类型
 			self.last_move = last_move 待出牌玩家出的牌
 			self.moves = moves 所有玩家按序打出的牌
+
+            返回值说明：
 			返回模型选择的当前应打出的牌及其类型
 			牌的类型有["dan", "dui", "san", "san_dai_yi", "san_dai_er", "shunzi"]，后期可扩展
 			打出的牌为一个list，元素为Card类
 		'''
-		### do something here
+
         return 'dan',[self.cards_left[0]]
 
 game = Game([MyModel(i) for i in range(3)])
