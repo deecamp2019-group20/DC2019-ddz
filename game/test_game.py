@@ -1,7 +1,10 @@
 import sys
-sys.path.append('../')
+from pathlib import Path
 
-from DouDiZhu.game.engine import *
+sys.path.append(str(Path(".")))
+
+from game.engine import *
+from game.gameutil import card_show
 
 class RandomModel(Agent):
     

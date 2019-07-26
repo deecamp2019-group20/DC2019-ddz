@@ -230,19 +230,19 @@ class Moves(object):
             self.bomb.append(self.king)
             
         #出单,出对,出三,炸弹(考虑拆开)
-        for k, v in self.card_num_info.items():
+        for _, v in self.card_num_info.items():
             if len(v) == 1:
                 self.dan.append(v)
-        for k, v in self.card_num_info.items():
+        for _, v in self.card_num_info.items():
             if len(v) == 2:
                 self.dui.append(v)
                 self.dan.append(v[:1])
-        for k, v in self.card_num_info.items():
+        for _, v in self.card_num_info.items():
             if len(v) == 3:
                 self.san.append(v)
                 self.dui.append(v[:2])
                 self.dan.append(v[:1])
-        for k, v in self.card_num_info.items():
+        for _, v in self.card_num_info.items():
             if len(v) == 4:
                 self.bomb.append(v)
                 self.san.append(v[:3])
@@ -396,7 +396,7 @@ class Agent(object):
 
     # 模型选择如何出牌
     def choose(self,state):
-        pass
+        return None, None
         
     # 选牌，返回下一步可能出的所有牌的类型 具体牌内容
     def get_moves(self, last_move_type, last_move):
@@ -442,7 +442,7 @@ class Agent(object):
 #              状态相关类                   #
 ############################################        
 class State(object):
-    def __init__(self, player_id, cards_left, cards_out, last_move_type, last_move,moves):
+    def __init__(self, player_id, cards_left, cards_out, last_move_type, last_move, moves):
         self.player_id = player_id
         self.cards_left = cards_left
         self.cards_out = cards_out
