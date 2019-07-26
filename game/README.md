@@ -41,13 +41,14 @@ for i_episode in range(1):
         winner = game.step()	#-1代表游戏未结束，0代表地主获胜，1代表地主下家获胜，2代表地主上家获胜
         game.show()
         if winner != -1:
-			if TRAIND_ID == 0 and winner == 0:
-				# do some positive reward
+            
+            if TRAIND_ID == 0 and winner == 0:
+                # do some positive reward
             elif TRAIND_ID != 0 and winner != 0:
-				# do some positive reward
-			else:
-				# do some negative reward
-				
+                # do some positive reward
+            else:
+                # do some negative reward
+            
             break
     
 ```
