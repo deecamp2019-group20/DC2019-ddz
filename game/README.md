@@ -1,0 +1,49 @@
+### python文件介绍
+- actions.py 所有的action
+- engine.py 引擎相关类
+- gameutil.py 相关工具类
+
+### 使用方法示例
+```Python3
+from.game.engine import Agent
+
+# 自己的模型继承Agent类并重写choose方法
+class MyModel(Agent):
+    
+    def choose(self,state):
+		'''
+			模型根据state选择出牌的方法
+			state.player_id 待出牌玩家的id，0代表地主，1代表地主下家，2代表地主上家
+			self.cards_left 待出牌玩家当前剩余手牌
+			self.cards_out 一个三维list，第一维按序存储地主打出的牌，第二维按序存储地主下家打出的牌，第三维按序存储地主上家打出的牌
+			self.last_move_type 待出牌玩家出的牌的类型
+			self.last_move = last_move 待出牌玩家出的牌
+			self.moves = moves 所有玩家按序打出的牌
+			返回模型选择的当前应打出的牌及其类型
+			牌的类型有["dan", "dui", "san", "san_dai_yi", "san_dai_er", "shunzi"]，后期可扩展
+			打出的牌为一个list，元素为Card类
+		'''
+		### do something here
+        return 'dan',[self.cards_left[0]]
+
+game = Game([MyModel(i) for i in range(3)])
+MAX_ROUNDS = 100
+TRAIND_ID = 0	# 进行训练的模型，0代表地主，1代表地主下家，2代表地主上家
+
+for i_episode in range(1):
+    game.game_reset()
+    game.show()	# 输出当前各个玩家的手牌
+    for i in range(MAX_ROUNDS):
+        winner = game.step()	#-1代表游戏未结束，0代表地主获胜，1代表地主下家获胜，2代表地主上家获胜
+        game.show()
+        if winner != -1:
+			if TRAIND_ID == 0 and winner == 0:
+				# do some positive reward
+            elif TRAIND_ID != 0 and winner != 0:
+				# do some positive reward
+			else:
+				# do some negative reward
+				
+            break
+    
+```
