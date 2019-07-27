@@ -2,8 +2,9 @@
 """
 自定义相关类
 """
+from __future__ import absolute_import
 
-from .gameutil import card_show
+from gameutil import card_show
 import numpy as np
 from typing import List, Tuple
 
@@ -15,7 +16,7 @@ class Game(object):
         # 初始化players
         self.players = []
         for p in agents:
-            p.set_game(self)
+            p.game = self
             self.players.append(p)
         self.game_reset()
         
@@ -32,9 +33,9 @@ class Game(object):
         p2_cards.sort(key=lambda x: x.rank)
         p3_cards = cards.cards[37:]
         p3_cards.sort(key=lambda x: x.rank)
-        self.players[0].cards_left = p1_cards
-        self.players[1].cards_left = p2_cards
-        self.players[2].cards_left = p3_cards
+        self.players[0].set_hand_card( p1_cards )
+        self.players[1].set_hand_card( p2_cards )
+        self.players[2].set_hand_card( p3_cards )
         self.cards_out = []
 
         #play相关参数
@@ -46,7 +47,7 @@ class Game(object):
     
     #游戏进行    
     def step(self):
-        state = State(self.index, self.players[self.index].cards_left, self.cards_out, self.last_move_type, self.last_move)
+        state = State(self.index, self.players[self.index].get_hand_card(), self.cards_out, self.last_move_type, self.last_move)
         self.last_move_type, self.last_move, self.end, self.yaobuqi = self.players[self.index].step(state)
         if self.yaobuqi:
             self.yaobuqis.append(self.index)
@@ -73,7 +74,7 @@ class Game(object):
 
     def show(self):
         for i in range(3):
-            card_show(self.players[i].cards_left,"Player {}".format(i),1)
+            card_show(self.players[i].get_hand_card(), "Player {}".format(i), 1)
 
 ############################################
 #              扑克牌相关类                 #
@@ -83,12 +84,18 @@ class Card(object):
     """
     扑克牌类
     """
+    color_show = {'a': '♠', 'b':'♥', 'c':'♣', 'd':'♦'}
+    name_show = {'14':'♔', '15':'♕'}
+    name_to_rank = {'3':1, '4':2, '5':3, \
+                    '6':4, '7':5, '8':6, '9':7, '10':8, 'J':9, 'Q':10, 'K':11, \
+                    'A':12, '2':13, '14':14, '15':15}
+
     def __init__(self, card_type):
-        self.card_type = card_type  # '牌面数字-花色-大小排名' 举例来说，红桃A的card_type为'1-♥-12'
+        self.card_type = card_type  # '牌面数字-花色' 举例来说，红桃A的card_type为'1-a'
         self.name = self.card_type.split('-')[0] # 名称,即牌面数字
         self.color = self.card_type.split('-')[1] # 花色
         # 大小
-        self.rank = int(self.card_type.split('-')[2])
+        self.rank = Card.name_to_rank[self.name]
 
     #判断大小
     def bigger_than(self, card_instance):
@@ -98,29 +105,31 @@ class Card(object):
             return False
 
     def __str__(self):
-        return self.name+self.color
+        return Card.name_show.get(self.name, self.name) + Card.color_show[self.color]
+    
+    __repr__ = __str__
     
 
 class Cards(object):
     """
-    一副扑克牌类,54张牌,小王14-♠,大王15-♠
+    一副扑克牌类,54张牌,小王14-a,大王15-a
     """
     def __init__(self):
         #初始化扑克牌类型
-        self.cards_type = ['1-♠-12', '1-♥-12','1-♣-12','1-♦-12',
-                           '2-♠-13', '2-♥-13','2-♣-13','2-♦-13',
-                           '3-♠-1', '3-♥-1','3-♣-1','3-♦-1',
-                           '4-♠-2', '4-♥-2','4-♣-2','4-♦-2',
-                           '5-♠-3', '5-♥-3','5-♣-3','5-♦-3',
-                           '6-♠-4', '6-♥-4','6-♣-4','6-♦-4',
-                           '7-♠-5', '7-♥-5','7-♣-5','7-♦-5',
-                           '8-♠-6', '8-♥-6','8-♣-6','8-♦-6',
-                           '9-♠-7', '9-♥-7','9-♣-7','9-♦-7',
-                           '10-♠-8', '10-♥-8','10-♣-8','10-♦-8',
-                           '11-♠-9', '11-♥-9','11-♣-9','11-♦-9',
-                           '12-♠-10', '12-♥-10','12-♣-10','12-♦-10',
-                           '13-♠-11', '13-♥-11','13-♣-11','13-♦-11',
-                           '14-♠-14', '15-♠-15']
+        self.cards_type = ['A-a', 'A-b','A-c','A-d',
+                           '2-a', '2-b','2-c','2-d',
+                           '3-a', '3-b','3-c','3-d',
+                           '4-a', '4-b','4-c','4-d',
+                           '5-a', '5-b','5-c','5-d',
+                           '6-a', '6-b','6-c','6-d',
+                           '7-a', '7-b','7-c','7-d',
+                           '8-a', '8-b','8-c','8-d',
+                           '9-a', '9-b','9-c','9-d',
+                           '10-a', '10-b','10-c','10-d',
+                           'J-a', 'J-b','J-c','J-d',
+                           'Q-a', 'Q-b','Q-c','Q-d',
+                           'K-a', 'K-b','K-c','K-d',
+                           '14-a', '15-a']
         #初始化扑克牌类                  
         self.cards = self.get_cards()
 
@@ -372,11 +381,15 @@ class Agent(object):
     """
     def __init__(self, player_id):
         self.player_id = player_id  # 0代表地主，1代表地主下家，2代表地主上家
-        self.cards_left = []
+        self.__cards_left = []
         self.cards_out = []
+        self.game = None
 
-    def set_game(self, game):
-        self.game = game
+    def set_hand_card(self, cards):
+        self.__cards_left = cards
+
+    def get_hand_card(self):
+        return self.__cards_left
 
     # 模型选择如何出牌
     def choose(self, state: 'State') -> (str, List[Card]):
@@ -387,7 +400,7 @@ class Agent(object):
         #所有出牌可选列表
         self.total_moves = Moves()
         #获取全部出牌列表
-        self.total_moves.get_total_moves(self.cards_left)
+        self.total_moves.get_total_moves(self.get_hand_card())
         #获取下次出牌列表
         self.next_move_types, self.next_moves = self.total_moves.get_next_moves(last_move_type, last_move)        
 
@@ -399,11 +412,11 @@ class Agent(object):
         if self.next_move_type in ["yaobuqi", "buyao"]:
             self.next_move = []
         for i in self.next_move:
-            self.cards_left.remove(i) 
+            self.get_hand_card().remove(i) 
 
         #是否牌局结束
         end = False
-        if len(self.cards_left) == 0:
+        if len(self.get_hand_card()) == 0:
             end = True
 
         #要不起&不要
@@ -423,6 +436,39 @@ class Agent(object):
         self.next_move_type, self.next_move = self.choose(state)
         self.game.cards_out.append( (self.player_id, self.next_move_type, self.next_move) )
         return self.__common_step(state.last_move_type, state.last_move)
+
+class FakeAgent(Agent):
+    def __init__(self, player_id, init_cards_cnt):
+        super().__init__(player_id)
+        self.cards_left_cnt = init_cards_cnt
+
+    #todo: 检查已出牌数量/当前形式的合法性
+    def step(self, state):
+        self.next_move = []
+        print("Player {}  ".format(self.player_id), end=' ')
+        #输入举例: [9] 或 [10]*4 + ['J']*2 等。不要或要不起输入[]
+        cards = eval(input())
+        for name in cards:
+            self.next_move.append(Card(f'{name}-a'))
+        next_move_type = state.last_move_type
+        if len(self.next_move)==0:
+            self.next_move_type = 'yaobuqi'
+            yaobuqi = True
+        else:
+            self.next_move_type = state.last_move_type
+            yaobuqi = False
+
+        self.cards_left_cnt -= len(self.next_move)
+        end = (self.cards_left_cnt==0)
+        self.game.cards_out.append( (self.player_id, self.next_move_type, self.next_move) )
+        return next_move_type, self.next_move, end, yaobuqi
+
+    def set_hand_card(self, cards):
+        self.__cards_left = []
+        return
+
+    def get_hand_card(self):
+        return []
 
 
 ############################################

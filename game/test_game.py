@@ -1,9 +1,8 @@
-import sys
-from pathlib import Path
-sys.path.append(str(Path(".")))
+from __future__ import absolute_import
 
-from game.engine import *
-from game.gameutil import card_show
+import sys
+from engine import Agent, Game, FakeAgent
+from gameutil import card_show
 import numpy as np
 
 
@@ -12,18 +11,12 @@ class RandomModel(Agent):
         valid_types, valid_moves = self.get_moves(state.last_move_type, state.last_move)
 
         # player i [手牌] // [出牌]
-        print("Player {}".format(self.player_id), end=' [')
-        for i in range(len(self.cards_left)):
-            print(self.cards_left[i], end= ', ' if i!=len(self.cards_left)-1 else '')
-        print(']', end=' // ')
+        print("Player {}".format(self.player_id), ' ', self.get_hand_card(), end=' // ')
 
         if len(valid_moves)>0:
             i = np.random.choice(len(valid_types))
             type, move = valid_types[i], valid_moves[i]
-            print('[', end='')
-            for i in range(len(move)):
-                print(move[i], end= ', ' if i!=len(move)-1 else '')
-            print(']')
+            print(move)
         else:
             type = 'yaobuqi'
             move = []
@@ -33,7 +26,7 @@ class RandomModel(Agent):
 
 
 
-game = Game([RandomModel(i) for i in range(3)])
+game = Game([RandomModel(0)]+ [FakeAgent(1, 17), FakeAgent(2, 17)])
 
 for i_episode in range(1):
     game.game_reset()
