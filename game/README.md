@@ -10,16 +10,15 @@ from.game.engine import Agent
 # 自己的模型继承Agent类并重写choose方法
 class MyModel(Agent):
     
-    def choose(self,state):
+    def choose(self):
 		'''
 			模型根据当前状态选择出牌的方法
-
-            参数说明：
-			state.player_id 当前玩家的id，0代表地主，1代表地主下家，2代表地主上家
+            说明：
+			self.player_id 当前玩家的id，0代表地主，1代表地主下家，2代表地主上家
 			self.get_hand_card() 当前剩余手牌
 			self.game.cards_out 所有玩家按序打出的牌。格式：[ (player_id, type, move), ... ]
-			self.last_move_type 上家出的牌的类型
-			self.last_move = last_move 上家出的牌
+			self.game.last_move_type 上家出的牌的类型
+			self.game.last_move = last_move 上家出的牌
 
 
             返回值说明：
@@ -28,7 +27,7 @@ class MyModel(Agent):
 			打出的牌为一个list，元素为Card类
 		'''
 
-        return 'dan', [self.cards_left[0]]
+        return 'dan', [self.get_hand_card()[0]]
 
 game = Game([MyModel(i) for i in range(3)])
 MAX_ROUNDS = 100

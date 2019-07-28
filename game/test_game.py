@@ -7,8 +7,8 @@ import numpy as np
 
 
 class RandomModel(Agent):
-    def choose(self, state):
-        valid_types, valid_moves = self.get_moves(state.last_move_type, state.last_move)
+    def choose(self):
+        valid_types, valid_moves = self.get_moves(self.game.last_move_type, self.game.last_move)
 
         # player i [手牌] // [出牌]
         print("Player {}".format(self.player_id), ' ', self.get_hand_card(), end=' // ')
@@ -26,7 +26,7 @@ class RandomModel(Agent):
 
 
 
-game = Game([RandomModel(0)]+ [FakeAgent(1, 17), FakeAgent(2, 17)])
+game = Game([RandomModel(i) for i in range(3)])
 
 for i_episode in range(1):
     game.game_reset()

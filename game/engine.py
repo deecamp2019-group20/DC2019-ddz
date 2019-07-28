@@ -47,8 +47,7 @@ class Game(object):
     
     #游戏进行    
     def step(self):
-        state = State(self.index, self.players[self.index].get_hand_card(), self.cards_out, self.last_move_type, self.last_move)
-        self.last_move_type, self.last_move, self.end, self.yaobuqi = self.players[self.index].step(state)
+        self.last_move_type, self.last_move, self.end, self.yaobuqi = self.players[self.index].step()
         if self.yaobuqi:
             self.yaobuqis.append(self.index)
         else:
@@ -392,7 +391,7 @@ class Agent(object):
         return self.__cards_left
 
     # 模型选择如何出牌
-    def choose(self, state: 'State') -> (str, List[Card]):
+    def choose(self) -> (str, List[Card]):
         return None, None
         
     # 选牌，返回下一步可能出的所有牌的类型 具体牌内容
@@ -431,11 +430,11 @@ class Agent(object):
         return next_move_type, next_move, end, yaobuqi
 
     # 出牌
-    def step(self, state):
+    def step(self):
         #在next_moves中选择出牌方法
-        self.next_move_type, self.next_move = self.choose(state)
+        self.next_move_type, self.next_move = self.choose()
         self.game.cards_out.append( (self.player_id, self.next_move_type, self.next_move) )
-        return self.__common_step(state.last_move_type, state.last_move)
+        return self.__common_step(self.game.last_move_type, self.game.last_move)
 
 class FakeAgent(Agent):
     def __init__(self, player_id, init_cards_cnt):
@@ -443,19 +442,19 @@ class FakeAgent(Agent):
         self.cards_left_cnt = init_cards_cnt
 
     #todo: 检查已出牌数量/当前形式的合法性
-    def step(self, state):
+    def step(self):
         self.next_move = []
         print("Player {}  ".format(self.player_id), end=' ')
         #输入举例: [9] 或 [10]*4 + ['J']*2 等。不要或要不起输入[]
         cards = eval(input())
         for name in cards:
             self.next_move.append(Card(f'{name}-a'))
-        next_move_type = state.last_move_type
+        next_move_type = self.game.last_move_type
         if len(self.next_move)==0:
             self.next_move_type = 'yaobuqi'
             yaobuqi = True
         else:
-            self.next_move_type = state.last_move_type
+            self.next_move_type = self.game.last_move_type
             yaobuqi = False
 
         self.cards_left_cnt -= len(self.next_move)
@@ -470,17 +469,3 @@ class FakeAgent(Agent):
     def get_hand_card(self):
         return []
 
-
-############################################
-#              状态相关类                   #
-############################################        
-class State(object):
-    def __init__(self, player_id: int, cards_left: List[Card], 
-                       cards_out: List[Tuple[int, str, List[Card]]], 
-                       last_move_type: str, 
-                       last_move: List[Card]):
-        self.player_id = player_id
-        self.cards_left = cards_left
-        self.cards_out = cards_out
-        self.last_move_type = last_move_type
-        self.last_move = last_move
