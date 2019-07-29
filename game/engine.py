@@ -9,7 +9,7 @@ import numpy as np
 from typing import List, Tuple
 import pandas as pd
 from collections import defaultdict
-from card_util import card_vectorize
+from card_util import card_vectorize, All as backup
 from os.path import join, abspath, dirname
 
 
@@ -139,14 +139,50 @@ class Card(object):
     __repr__ = __str__
     
 
+def get_move_desc(move: List[int]):
+    """
+    输入出牌， 返回牌型描述：总张数，主牌，类型
+    """
+    key = str(sorted(move))
+    row = backup[ backup['key']==key ]
+    if len(row)!=1:
+        return None
+    i = row.index[0]
+    return (row.at[i, 'sum'], row.at[i, 'main'], row.at[i, 'type'])
+
+def get_decomposition(hand_card, last_move):
+    """
+    hand_card: 长度为15的list， 每个元素分别表示手牌中有多少个3/4/5/.../A/2/14/15.
+    last_move: 上一个有效出牌，e.g. [3,3,3,2]。空表示随意出牌。
+    返回当前有效出牌， 格式：[{'3':0, '4':3, '5':1, ...}, {...}]。性能会有问题。
+    """
+    frame = backup.copy()
+    mat = frame[Card.all_card_name].values
+    enough = []
+    for i in range(len(mat)):
+        if all(np.greater_equal(hand_card, mat[i])):
+            enough.append(True)
+        else:
+            enough.append(False)
+    frame['enough'] = enough
+    moves = frame[frame['enough']]
+
+    if len(last_move)>0:
+        last_desc = get_move_desc(last_move)
+        sm, mn, tp = last_desc
+        moves = moves[ ( (moves['type']==tp)&(moves['main']>mn)&(moves['sum']==sm) )
+                         | ( (moves['type']=='zha')&(moves['main']>mn) )
+                         | (moves['type']=='buyao') | (moves['type']=='wangezha')  ]
+    return moves.to_dict(orient='records')
+
+
 ############################################
 #              玩家相关类                   #
-############################################        
+############################################
 class Agent(object):
     """
     玩家类,所有模型都应继承此类并重写choose方法
     """
-    backup =  pd.read_csv(join(dirname(abspath(__file__)), "patterns.csv")).fillna(0)
     def __init__(self, player_id):
         self.player_id = player_id  # 0代表地主，1代表地主下家，2代表地主上家
         self.__cards_left = defaultdict(list)  # e.g. {'3':[cards], ...}
@@ -157,7 +193,7 @@ class Agent(object):
         self.__cards_left = defaultdict(list)  # e.g. {'3':[cards], ...}
         for c in cards:
             self.__cards_left[c.name].append( c )
-        self.moves = self.get_all_moves( Agent.backup.copy() )
+        self.moves = self.get_all_moves( backup.copy() )
 
     def get_hand_card(self):
         return self.__cards_left
@@ -210,22 +246,12 @@ class Agent(object):
             end = True
         return end, move_desc[-1]=='buyao'
 
-    def get_move_desc(self, move: List[int]):
-        """
-        输入出牌， 返回牌型描述：总张数，主牌，类型
-        """
-        key = str(sorted(move))
-        row = Agent.backup[ Agent.backup['key']==key ]
-        if len(row)!=1:
-            return None
-        i = row.index[0]
-        return (row.at[i, 'sum'], row.at[i, 'main'], row.at[i, 'type'])
 
     # 出牌
     def step(self):
         #在next_moves中选择出牌方法
         move = self.choose()
-        desc = self.get_move_desc(move)
+        desc = get_move_desc(move)
         end, buyao = self.__common_step(move, desc)
         return move, desc, end, buyao
 

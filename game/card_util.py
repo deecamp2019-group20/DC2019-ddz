@@ -22,7 +22,7 @@ wangzha     1
 import pandas as pd
 from itertools import combinations
 from collections import defaultdict
-from os.path import join, abspath, dirname
+from os.path import join, abspath, dirname, exists
 
 card = [str(i) for i in range(3, 14)] + ['1', '2', '14', '15']
 name_to_rank = {'3':1, '4':2, '5':3, \
@@ -206,7 +206,10 @@ def calc_key(row):
     s = str(sorted(s))
     return s
 
-if __name__=="__main__":
+
+if exists(  join(dirname(abspath(__file__)), "patterns.csv")  ):
+    All = pd.read_csv(join(dirname(abspath(__file__)), "patterns.csv")).fillna(0)
+else:
     All = pd.concat([dan(), dui(), san(), san_yi(), san_er(), 
                      dan_shun(), er_shun(), feiji(), xfeiji(), dfeiji(), 
                      zha(), si_erdan(), si_erdui(), wangzha(), buyao()], axis=0, sort=False).fillna(0)
