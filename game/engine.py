@@ -7,6 +7,11 @@ from __future__ import absolute_import
 from gameutil import card_show
 import numpy as np
 from typing import List, Tuple
+import pandas as pd
+from collections import defaultdict
+from card_util import card_vectorize
+from os.path import join, abspath, dirname
+
 
 ############################################
 #                 游戏类                   #
@@ -23,15 +28,15 @@ class Game(object):
     # 游戏环境重置
     def game_reset(self):
         #初始化一副扑克牌类
-        cards = Cards()
+        cards = Card.init_card_suit()
         #洗牌
-        np.random.shuffle(cards.cards)
+        np.random.shuffle(cards)
         #发牌并排序
-        p1_cards = cards.cards[:20]
+        p1_cards = cards[:20]
         p1_cards.sort(key=lambda x: x.rank)
-        p2_cards = cards.cards[20:37]
+        p2_cards = cards[20:37]
         p2_cards.sort(key=lambda x: x.rank)
-        p3_cards = cards.cards[37:]
+        p3_cards = cards[37:]
         p3_cards.sort(key=lambda x: x.rank)
         self.players[0].set_hand_card( p1_cards )
         self.players[1].set_hand_card( p2_cards )
@@ -40,22 +45,26 @@ class Game(object):
 
         #play相关参数
         self.end = False    # 游戏是否结束
-        self.last_move_type = self.last_move = "start"
+        self.last_desc = self.last_move = None
         self.playround = 1  # 回合数
         self.index = 0  # 当前玩家的id，0代表地主，1代表地主下家，2代表地主上家
         self.yaobuqis = []
     
     #游戏进行    
     def step(self):
-        self.last_move_type, self.last_move, self.end, self.yaobuqi = self.players[self.index].step()
-        if self.yaobuqi:
+        cur_move, cur_desc, self.end, buyao = self.players[self.index].step()
+        if buyao:
             self.yaobuqis.append(self.index)
         else:
             self.yaobuqis = []
+            self.last_move = cur_move
+            self.last_desc = cur_desc
+            self.is_start = False
+
         #都要不起
         if len(self.yaobuqis) == len(self.players)-1:
             self.yaobuqis = []
-            self.last_move_type = self.last_move = "start"
+            self.last_desc = self.last_move = None
 
         winner = -1
         if self.end:
@@ -67,12 +76,13 @@ class Game(object):
             #playrecords.show("=============Round " + str(playround) + " End=============")
             self.playround = self.playround + 1
             #playrecords.show("=============Round " + str(playround) + " Start=============")
-            self.index = 0  
-
+            self.index = 0
+        
+        #todo: return more information
         return winner
 
     def show(self):
-        for i in range(3):
+        for i in range(len(self.players)):
             card_show(self.players[i].get_hand_card(), "Player {}".format(i), 1)
 
 ############################################
@@ -83,11 +93,36 @@ class Card(object):
     """
     扑克牌类
     """
-    color_show = {'a': '♠', 'b':'♥', 'c':'♣', 'd':'♦'}
-    name_show = {'14':'♔', '15':'♕'}
+    color_show = {}
+#    color_show = {'a': '♠', 'b':'♥', 'c':'♣', 'd':'♦'}
+    name_show = {'11':'J', '12':'Q', '13':'K', '14':'B', '15':'R'}
     name_to_rank = {'3':1, '4':2, '5':3, \
-                    '6':4, '7':5, '8':6, '9':7, '10':8, 'J':9, 'Q':10, 'K':11, \
-                    'A':12, '2':13, '14':14, '15':15}
+                    '6':4, '7':5, '8':6, '9':7, '10':8, '11':9, '12':10, '13':11, \
+                    '1':12, '2':13, '14':14, '15':15}
+    all_card_type = ['1-a', '1-b','1-c','1-d',
+                  '2-a', '2-b','2-c','2-d',
+                  '3-a', '3-b','3-c','3-d',
+                  '4-a', '4-b','4-c','4-d',
+                  '5-a', '5-b','5-c','5-d',
+                  '6-a', '6-b','6-c','6-d',
+                  '7-a', '7-b','7-c','7-d',
+                  '8-a', '8-b','8-c','8-d',
+                  '9-a', '9-b','9-c','9-d',
+                  '10-a', '10-b','10-c','10-d',
+                  '11-a', '11-b','11-c','11-d',
+                  '12-a', '12-b','12-c','12-d',
+                  '13-a', '13-b','13-c','13-d',
+                  '14-a', '15-a']
+
+    all_card_name = [str(i) for i in range(3, 14)] + ['1', '2', '14', '15']
+
+    @staticmethod
+    def init_card_suit():
+        cards = []
+        for card_type in Card.all_card_type:
+            cards.append(Card(card_type))
+        return cards
+
 
     def __init__(self, card_type):
         self.card_type = card_type  # '牌面数字-花色' 举例来说，红桃A的card_type为'1-a'
@@ -96,280 +131,13 @@ class Card(object):
         # 大小
         self.rank = Card.name_to_rank[self.name]
 
-    #判断大小
-    def bigger_than(self, card_instance):
-        if (self.rank > card_instance.rank):
-            return True
-        else:
-            return False
 
     def __str__(self):
-        return Card.name_show.get(self.name, self.name) + Card.color_show[self.color]
+        return Card.name_show.get(self.name, self.name)
+#        return Card.name_show.get(self.name, self.name) + Card.color_show.get(self.color, self.color)
     
     __repr__ = __str__
     
-
-class Cards(object):
-    """
-    一副扑克牌类,54张牌,小王14-a,大王15-a
-    """
-    def __init__(self):
-        #初始化扑克牌类型
-        self.cards_type = ['A-a', 'A-b','A-c','A-d',
-                           '2-a', '2-b','2-c','2-d',
-                           '3-a', '3-b','3-c','3-d',
-                           '4-a', '4-b','4-c','4-d',
-                           '5-a', '5-b','5-c','5-d',
-                           '6-a', '6-b','6-c','6-d',
-                           '7-a', '7-b','7-c','7-d',
-                           '8-a', '8-b','8-c','8-d',
-                           '9-a', '9-b','9-c','9-d',
-                           '10-a', '10-b','10-c','10-d',
-                           'J-a', 'J-b','J-c','J-d',
-                           'Q-a', 'Q-b','Q-c','Q-d',
-                           'K-a', 'K-b','K-c','K-d',
-                           '14-a', '15-a']
-        #初始化扑克牌类                  
-        self.cards = self.get_cards()
-
-    #初始化扑克牌类
-    def get_cards(self):
-        cards = []
-        for card_type in self.cards_type:
-            cards.append(Card(card_type))
-        #打乱顺序
-        #np.random.shuffle(cards)
-        return cards
-
-
-############################################
-#              出牌相关类                   #
-############################################
-class Feiji(object):
-    """
-    飞机类
-    """
-    def __init__(self, start, end, with_type, with_cards):
-        self.start = start
-        self.end = end
-        self.with_type = with_type    # 飞机带牌数量，可选0 1 2
-        self.with_cards = with_cards    # 飞机带的牌
-
-class Qiegeji(object):
-    """
-    切割机类
-    """
-    def __init__(self, start, end):
-        self.start = start
-        self.end = end
-
-class Moves(object):
-    """
-    出牌类,单,对,三,三带一,三带二,顺子,炸弹
-    """ 
-    def __init__(self):
-        #出牌信息
-        self.dan = []
-        self.dui = []
-        self.san = []
-        self.san_dai_yi = []
-        self.san_dai_er = []
-        self.bomb = []
-        self.shunzi = []
-        self.sidai2 = []
-        self.sidai2dui = []
-        self.feiji = []
-        self.qiegeji = []
-        
-        #牌数量信息
-        self.card_num_info = {}
-        #牌顺序信息,计算顺子
-        self.card_order_info = []
-        #王牌信息
-        self.king = []
-        
-        #下次出牌
-        self.next_moves = []
-        #下次出牌类型
-        self.next_moves_type = []
-        
-    #获取全部出牌列表
-    def get_total_moves(self, cards_left):
-        
-        #统计牌数量/顺序/王牌信息
-        for i in cards_left:
-            #王牌信息
-            if i.rank in [14,15]:
-                self.king.append(i)
-            #数量
-            tmp = self.card_num_info.get(i.name, [])
-            if len(tmp) == 0:
-                self.card_num_info[i.name] = [i]
-            else:
-                self.card_num_info[i.name].append(i)
-            #顺序
-            if i.rank in [13,14,15]: #不统计2,小王,大王
-                continue
-            elif len(self.card_order_info) == 0:
-                self.card_order_info.append(i)
-            elif i.rank != self.card_order_info[-1].rank:
-                self.card_order_info.append(i)
-        
-        #王炸
-        if len(self.king) == 2:
-            self.bomb.append(self.king)
-            
-        #出单,出对,出三,炸弹(考虑拆开)
-        for _, v in self.card_num_info.items():
-            if len(v) == 1:
-                self.dan.append(v)
-        for _, v in self.card_num_info.items():
-            if len(v) == 2:
-                self.dui.append(v)
-                self.dan.append(v[:1])
-        for _, v in self.card_num_info.items():
-            if len(v) == 3:
-                self.san.append(v)
-                self.dui.append(v[:2])
-                self.dan.append(v[:1])
-        for _, v in self.card_num_info.items():
-            if len(v) == 4:
-                self.bomb.append(v)
-                self.san.append(v[:3])
-                self.dui.append(v[:2])
-                self.dan.append(v[:1])
-                
-        #三带一,三带二
-        for san in self.san:
-            #if self.dan[0][0].name != san[0].name:
-            #    self.san_dai_yi.append(san+self.dan[0])
-            #if self.dui[0][0].name != san[0].name:
-            #    self.san_dai_er.append(san+self.dui[0])
-            for dan in self.dan:
-                #防止重复
-                if dan[0].name != san[0].name:
-                    self.san_dai_yi.append(san+dan)
-            for dui in self.dui:
-                #防止重复
-                if dui[0].name != san[0].name:
-                    self.san_dai_er.append(san+dui)  
-                    
-        #获取最长顺子
-        max_len = []
-        for i in self.card_order_info:
-            if i == self.card_order_info[0]:
-                max_len.append(i)
-            elif max_len[-1].rank == i.rank - 1:
-                max_len.append(i)
-            else:
-                if len(max_len) >= 5:
-                   self.shunzi.append(max_len) 
-                max_len = [i]
-        #最后一轮
-        if len(max_len) >= 5:
-           self.shunzi.append(max_len)   
-        #拆顺子 
-        shunzi_sub = []             
-        for i in self.shunzi:
-            len_total = len(i)
-            n = len_total - 5
-            #遍历所有可能顺子长度
-            while(n > 0):
-                len_sub = len_total - n
-                j = 0
-                while(len_sub+j <= len(i)):
-                    #遍历该长度所有组合
-                    shunzi_sub.append(i[j:len_sub+j])
-                    j = j + 1
-                n = n - 1
-        self.shunzi.extend(shunzi_sub)
-                
-    #获取下次出牌列表
-    def get_next_moves(self, last_move_type, last_move)-> (List[str], List[List[Card]]): 
-        #没有last,全加上,除了bomb最后加
-        if last_move_type == "start":
-            moves_types = ["dan", "dui", "san", "san_dai_yi", "san_dai_er", "shunzi"]
-            i = 0
-            for move_type in [self.dan, self.dui, self.san, self.san_dai_yi, 
-                      self.san_dai_er, self.shunzi]:
-                for move in move_type:
-                    self.next_moves.append(move)
-                    self.next_moves_type.append(moves_types[i])
-                i = i + 1
-        #出单
-        elif last_move_type == "dan":
-            for move in self.dan:
-                #比last大
-                if move[0].bigger_than(last_move[0]):
-                    self.next_moves.append(move)  
-                    self.next_moves_type.append("dan")
-        #出对
-        elif last_move_type == "dui":
-            for move in self.dui:
-                #比last大
-                if move[0].bigger_than(last_move[0]):
-                    self.next_moves.append(move) 
-                    self.next_moves_type.append("dui")
-        #出三个
-        elif last_move_type == "san":
-            for move in self.san:
-                #比last大
-                if move[0].bigger_than(last_move[0]):
-                    self.next_moves.append(move) 
-                    self.next_moves_type.append("san")
-        #出三带一
-        elif last_move_type == "san_dai_yi":
-            for move in self.san_dai_yi:
-                #比last大
-                if move[0].bigger_than(last_move[0]):
-                    self.next_moves.append(move)    
-                    self.next_moves_type.append("san_dai_yi")
-        #出三带二
-        elif last_move_type == "san_dai_er":
-            for move in self.san_dai_er:
-                #比last大
-                if move[0].bigger_than(last_move[0]):
-                    self.next_moves.append(move)   
-                    self.next_moves_type.append("san_dai_er")
-        #出炸弹
-        elif last_move_type == "bomb":
-            for move in self.bomb:
-                #比last大
-                if move[0].bigger_than(last_move[0]):
-                    self.next_moves.append(move) 
-                    self.next_moves_type.append("bomb")
-        #出顺子
-        elif last_move_type == "shunzi":
-            for move in self.shunzi:
-                #相同长度
-                if len(move) == len(last_move):
-                    #比last大
-                    if move[0].bigger_than(last_move[0]):
-                        self.next_moves.append(move) 
-                        self.next_moves_type.append("shunzi")
-        else:
-            print("last_move_type_wrong")
-            
-        #除了bomb,都可以出炸
-        if last_move_type != "bomb":
-            for move in self.bomb:
-                self.next_moves.append(move) 
-                self.next_moves_type.append("bomb")
-                
-        return self.next_moves_type, self.next_moves
-    
-    
-    #展示
-    def show(self, info):
-        print(info)
-        #card_show(self.dan, "dan", 2)
-        #card_show(self.dui, "dui", 2)
-        #card_show(self.san, "san", 2)
-        #card_show(self.san_dai_yi, "san_dai_yi", 2)
-        #card_show(self.san_dai_er, "san_dai_er", 2)
-        #card_show(self.bomb, "bomb", 2)
-        #card_show(self.shunzi, "shunzi", 2)
-        #card_show(self.next_moves, "next_moves", 2)
 
 ############################################
 #              玩家相关类                   #
@@ -378,94 +146,100 @@ class Agent(object):
     """
     玩家类,所有模型都应继承此类并重写choose方法
     """
+    backup =  pd.read_csv(join(dirname(abspath(__file__)), "patterns.csv")).fillna(0)
     def __init__(self, player_id):
         self.player_id = player_id  # 0代表地主，1代表地主下家，2代表地主上家
-        self.__cards_left = []
-        self.cards_out = []
+        self.__cards_left = defaultdict(list)  # e.g. {'3':[cards], ...}
         self.game = None
+        self.moves = None
 
     def set_hand_card(self, cards):
-        self.__cards_left = cards
+        self.__cards_left = defaultdict(list)  # e.g. {'3':[cards], ...}
+        for c in cards:
+            self.__cards_left[c.name].append( c )
+        self.moves = self.get_all_moves( Agent.backup.copy() )
 
     def get_hand_card(self):
         return self.__cards_left
 
-    # 模型选择如何出牌
-    def choose(self) -> (str, List[Card]):
-        return None, None
-        
-    # 选牌，返回下一步可能出的所有牌的类型 具体牌内容
-    def get_moves(self, last_move_type, last_move):
-        #所有出牌可选列表
-        self.total_moves = Moves()
-        #获取全部出牌列表
-        self.total_moves.get_total_moves(self.get_hand_card())
-        #获取下次出牌列表
-        self.next_move_types, self.next_moves = self.total_moves.get_next_moves(last_move_type, last_move)        
+    def get_all_moves(self, frame):
+        """
+        根据手牌，筛选合法的组合。
+        """
+        enough = []
+        v = card_vectorize(self.__cards_left)
+        mat = frame[Card.all_card_name].values
+        for i in range(len(mat)):
+            if all(np.greater_equal(v, mat[i])):
+                enough.append(True)
+            else:
+                enough.append(False)
+        frame['enough'] = enough
+        moves = frame[frame['enough']]
+        return moves
 
-        return self.next_move_types, self.next_moves
+    def get_moves(self, last_move, last_desc)->List[dict]:
+        '''
+        根据前面玩家的出牌来选牌，返回下一步所有合法出牌。
+        '''
+        if self.game.last_desc is None:
+            movs = self.moves
+        else:
+            sm, mn, tp = last_desc
+            movs = self.moves[ ( (self.moves['type']==tp)&(self.moves['main']>mn)&(self.moves['sum']==sm) )
+                             | ( (self.moves['type']=='zha')&(self.moves['main']>mn) )
+                             | (self.moves['type']=='buyao') | (self.moves['type']=='wangezha')  ]
+        return movs.to_dict(orient='records')
     
+    # 模型选择如何出牌
+    def choose(self) -> List[int]:
+        return []
+
     # 进行一步之后的公共操作
-    def __common_step(self, last_move_type, last_move):
-        #移除出掉的牌
-        if self.next_move_type in ["yaobuqi", "buyao"]:
-            self.next_move = []
-        for i in self.next_move:
-            self.get_hand_card().remove(i) 
+    def __common_step(self, move, move_desc):
+        #分配花色/重新计算可行出牌; 移除出掉的牌; 记录
+        out = []
+        for card in move:
+            out.append(self.get_hand_card()[str(card)].pop())
+        self.moves = self.get_all_moves(self.moves)
+        self.game.cards_out.append( (self.player_id, move_desc[-1], out) )
 
         #是否牌局结束
         end = False
-        if len(self.get_hand_card()) == 0:
+        if sum([len(v) for v in self.__cards_left.values()]) == 0:
             end = True
+        return end, move_desc[-1]=='buyao'
 
-        #要不起&不要
-        if self.next_move_type in ["yaobuqi","buyao"]:
-            yaobuqi = True
-            next_move_type = last_move_type
-            next_move = last_move
-        else:
-            yaobuqi = False
-            next_move_type = self.next_move_type
-            next_move = self.next_move
-        return next_move_type, next_move, end, yaobuqi
+    def get_move_desc(self, move: List[int]):
+        """
+        输入出牌， 返回牌型描述：总张数，主牌，类型
+        """
+        key = str(sorted(move))
+        row = Agent.backup[ Agent.backup['key']==key ]
+        if len(row)!=1:
+            return None
+        i = row.index[0]
+        return (row.at[i, 'sum'], row.at[i, 'main'], row.at[i, 'type'])
 
     # 出牌
     def step(self):
         #在next_moves中选择出牌方法
-        self.next_move_type, self.next_move = self.choose()
-        self.game.cards_out.append( (self.player_id, self.next_move_type, self.next_move) )
-        return self.__common_step(self.game.last_move_type, self.game.last_move)
+        move = self.choose()
+        desc = self.get_move_desc(move)
+        end, buyao = self.__common_step(move, desc)
+        return move, desc, end, buyao
 
-class FakeAgent(Agent):
-    def __init__(self, player_id, init_cards_cnt):
-        super().__init__(player_id)
-        self.cards_left_cnt = init_cards_cnt
-
-    #todo: 检查已出牌数量/当前形式的合法性
+class ManualAgent(Agent):
     def step(self):
-        self.next_move = []
         print("Player {}  ".format(self.player_id), end=' ')
-        #输入举例: [9] 或 [10]*4 + ['J']*2 等。不要或要不起输入[]
-        cards = eval(input())
-        for name in cards:
-            self.next_move.append(Card(f'{name}-a'))
-        next_move_type = self.game.last_move_type
-        if len(self.next_move)==0:
-            self.next_move_type = 'yaobuqi'
-            yaobuqi = True
-        else:
-            self.next_move_type = self.game.last_move_type
-            yaobuqi = False
+        #输入举例: [9] 或 [10]*4 + [11]*2 等。不要或要不起输入[]
+        desc = None
+        while desc is None:
+            move = eval(input())
+            desc = self.get_move_desc(move)
+            #todo: 检查已出牌数量
+            if desc is not None:
+                end, buyao = self.__common_step(move, desc)
+                return move, desc, end, buyao
 
-        self.cards_left_cnt -= len(self.next_move)
-        end = (self.cards_left_cnt==0)
-        self.game.cards_out.append( (self.player_id, self.next_move_type, self.next_move) )
-        return next_move_type, self.next_move, end, yaobuqi
-
-    def set_hand_card(self, cards):
-        self.__cards_left = []
-        return
-
-    def get_hand_card(self):
-        return []
 

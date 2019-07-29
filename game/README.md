@@ -15,19 +15,21 @@ class MyModel(Agent):
 			模型根据当前状态选择出牌的方法
             说明：
 			self.player_id 当前玩家的id，0代表地主，1代表地主下家，2代表地主上家
-			self.get_hand_card() 当前剩余手牌
+			self.get_hand_card() 当前剩余手牌，格式: {牌面: [Card]}
 			self.game.cards_out 所有玩家按序打出的牌。格式：[ (player_id, type, move), ... ]
-			self.game.last_move_type 上家出的牌的类型
-			self.game.last_move = last_move 上家出的牌
+			self.game.last_desc 上家出的牌的描述（如果上家未出则是上上家），三元组（总张数，主牌rank，类型）
+			self.game.last_move 上家出的牌
 
 
-            返回值说明：
-			返回模型选择的当前应打出的牌及其类型
-			牌的类型有["dan", "dui", "san", "san_dai_yi", "san_dai_er", "shunzi"]，后期可扩展
-			打出的牌为一个list，元素为Card类
+            应返回出牌列表，空列表表示不要/要不起， 格式举例：
+            [13]
+            [1,1,1,4]
+            [3,3]
+            [14,15]
+            [2,2,2,2]
 		'''
 
-        return 'dan', [self.get_hand_card()[0]]
+        return []
 
 game = Game([MyModel(i) for i in range(3)])
 MAX_ROUNDS = 100

@@ -6,11 +6,7 @@ def card_show(cards, info, n):
     
     #扑克牌记录类展示
     if n == 1:
-        print(info)
-        names = []
-        for i in cards:
-            names.append(i.name+i.color)
-        print(names)  
+        print(info, cards)
     #Moves展示
     elif n == 2:
         if len(cards) == 0:

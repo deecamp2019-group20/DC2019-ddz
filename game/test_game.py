@@ -1,28 +1,28 @@
 from __future__ import absolute_import
 
 import sys
-from engine import Agent, Game, FakeAgent
-from gameutil import card_show
+from engine import Agent, Game, ManualAgent, Card
 import numpy as np
 
 
 class RandomModel(Agent):
     def choose(self):
-        valid_types, valid_moves = self.get_moves(self.game.last_move_type, self.game.last_move)
+        valid_moves = self.get_moves(self.game.last_move, self.game.last_desc)
 
         # player i [手牌] // [出牌]
-        print("Player {}".format(self.player_id), ' ', self.get_hand_card(), end=' // ')
+        hand_card = []
+        for ls in self.get_hand_card().values():
+            hand_card.extend(list(ls))
+        print("Player {}".format(self.player_id), ' ', hand_card, end=' // ')
 
-        if len(valid_moves)>0:
-            i = np.random.choice(len(valid_types))
-            type, move = valid_types[i], valid_moves[i]
-            print(move)
-        else:
-            type = 'yaobuqi'
-            move = []
-            print("要不起(不要)")
+        i = np.random.choice(len(valid_moves))
+        tmp = valid_moves[i]
+        move = []
+        for k in Card.all_card_name:
+            move.extend([int(k)]* tmp.get(k, 0))
+        print(move)
 
-        return type, move
+        return move
 
 
 
