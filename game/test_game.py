@@ -6,7 +6,7 @@ import numpy as np
 
 
 class RandomModel(Agent):
-    def choose(self):
+    def choose(self, state):
         valid_moves = self.get_moves(self.game.last_move, self.game.last_desc)
 
         # player i [手牌] // [出牌]

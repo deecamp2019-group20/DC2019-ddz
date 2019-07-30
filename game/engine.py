@@ -6,16 +6,26 @@ from __future__ import absolute_import
 
 from gameutil import card_show
 import numpy as np
-from typing import List, Tuple
+from typing import List, Tuple, Dict
 import pandas as pd
 from collections import defaultdict
-from card_util import card_vectorize, All as backup
+from card_util import All as backup
 from os.path import join, abspath, dirname
 
 
 ############################################
 #                 游戏类                   #
-############################################                   
+############################################
+class GameState():
+    def __init__(self):
+        self.hand = None
+        self.out = None
+        self.up_out = None
+        self.down_out = None
+        self.self_out = None
+        self.other_hand = None
+
+
 class Game(object):
     def __init__(self, agents: List['Agent']):
         # 初始化players
@@ -25,6 +35,22 @@ class Game(object):
             self.players.append(p)
         self.game_reset()
         
+    def get_state(self)->GameState:
+        state = GameState()
+        state.hand = Card.vectorize_card_dict(self.players[self.index].get_hand_card())
+        tmp, state.out = Card.vectorized_card_out(self.cards_out, len(self.players))
+        state.up_out = tmp[self.get_up_index()]
+        state.down_out = tmp[self.get_down_index()]
+        state.self_out = tmp[self.index]
+        state.other_hand = (np.array([4]*13+[1,1]) - state.hand - state.out).tolist()
+        return state
+
+    def get_up_index(self):
+        return len(self.players)-1 if self.index==0 else self.index-1
+    
+    def get_down_index(self):
+        return 0 if self.index==len(self.players)-1 else self.index+1
+
     # 游戏环境重置
     def game_reset(self):
         #初始化一副扑克牌类
@@ -32,6 +58,7 @@ class Game(object):
         #洗牌
         np.random.shuffle(cards)
         #发牌并排序
+        self.mingpai = cards[:3]
         p1_cards = cards[:20]
         p1_cards.sort(key=lambda x: x.rank)
         p2_cards = cards[20:37]
@@ -49,10 +76,15 @@ class Game(object):
         self.playround = 1  # 回合数
         self.index = 0  # 当前玩家的id，0代表地主，1代表地主下家，2代表地主上家
         self.yaobuqis = []
+        return Card.vectorize_card_dict(self.players[0].get_hand_card()),\
+               Card.vectorize_card_dict(self.players[1].get_hand_card()),\
+               Card.vectorize_card_dict(self.players[2].get_hand_card()),\
+               Card.vectorized_card_list(self.mingpai)
+
     
     #游戏进行    
     def step(self):
-        cur_move, cur_desc, self.end, buyao = self.players[self.index].step()
+        cur_move, cur_desc, self.end, buyao = self.players[self.index].step(self.get_state())
         if buyao:
             self.yaobuqis.append(self.index)
         else:
@@ -115,6 +147,48 @@ class Card(object):
                   '14-a', '15-a']
 
     all_card_name = [str(i) for i in range(3, 14)] + ['1', '2', '14', '15']
+
+    @staticmethod
+    def vectorize_card_dict(cards: Dict[str, List['Card']]):
+        """
+        cards: defaultdict(list).
+        返回cards的vector表示，长度为15。
+        每个元素依次表示 有多少个 3/4/5.../Q/K/A/2/14/15。
+        """
+        v = []
+        for n in Card.all_card_name:
+            v.append(len(cards[n]))
+        return v
+
+    @staticmethod
+    def vectorized_card_list(cards: List):
+        v = [0] * len(Card.all_card_name)
+        for c in cards:
+            if isinstance(c, int):
+                i = Card.name_to_rank[str(c)]
+            elif isinstance(c, str):
+                i = Card.name_to_rank[c]
+            elif isinstance(c, Card):
+                i = c.rank-1
+            else:
+                print("Warn: Unkown card.")
+            v[ i ]+=1
+        return v
+
+    @staticmethod
+    def vectorized_card_out(cards_out: List[Tuple[int, str, List['Card']]], total_player=3):
+        cnt = {}
+        for rec in cards_out:
+            a = cnt.get(rec[0], np.zeros( len(Card.all_card_name) )) # 15
+            b = np.array( Card.vectorized_card_list(rec[2])  )
+            cnt[rec[0]] = a+b
+        a = np.zeros( len(Card.all_card_name) )
+        for v in cnt.values():
+            a+=v
+        res = []
+        for i in range(total_player):
+            res.append(cnt.get(i, np.zeros( len(Card.all_card_name) )).tolist())
+        return res, a.tolist()
 
     @staticmethod
     def init_card_suit():
@@ -193,17 +267,17 @@ class Agent(object):
         self.__cards_left = defaultdict(list)  # e.g. {'3':[cards], ...}
         for c in cards:
             self.__cards_left[c.name].append( c )
-        self.moves = self.get_all_moves( backup.copy() )
+        self.moves = self.__get_all_moves( backup.copy() )
 
     def get_hand_card(self):
         return self.__cards_left
 
-    def get_all_moves(self, frame):
+    def __get_all_moves(self, frame):
         """
         根据手牌，筛选合法的组合。
         """
         enough = []
-        v = card_vectorize(self.__cards_left)
+        v = Card.vectorize_card_dict(self.__cards_left)
         mat = frame[Card.all_card_name].values
         for i in range(len(mat)):
             if all(np.greater_equal(v, mat[i])):
@@ -224,11 +298,11 @@ class Agent(object):
             sm, mn, tp = last_desc
             movs = self.moves[ ( (self.moves['type']==tp)&(self.moves['main']>mn)&(self.moves['sum']==sm) )
                              | ( (self.moves['type']=='zha')&(self.moves['main']>mn) )
-                             | (self.moves['type']=='buyao') | (self.moves['type']=='wangezha')  ]
+                             | (self.moves['type']=='buyao') | (self.moves['type']=='wangzha')  ]
         return movs.to_dict(orient='records')
     
     # 模型选择如何出牌
-    def choose(self) -> List[int]:
+    def choose(self, state: GameState) -> List[int]:
         return []
 
     # 进行一步之后的公共操作
@@ -236,8 +310,8 @@ class Agent(object):
         #分配花色/重新计算可行出牌; 移除出掉的牌; 记录
         out = []
         for card in move:
-            out.append(self.get_hand_card()[str(card)].pop())
-        self.moves = self.get_all_moves(self.moves)
+            out.append(self.__cards_left[str(card)].pop())
+        self.moves = self.__get_all_moves(self.moves)
         self.game.cards_out.append( (self.player_id, move_desc[-1], out) )
 
         #是否牌局结束
@@ -246,23 +320,23 @@ class Agent(object):
             end = True
         return end, move_desc[-1]=='buyao'
 
-
     # 出牌
-    def step(self):
+    def step(self, state):
         #在next_moves中选择出牌方法
-        move = self.choose()
+        move = self.choose(state)
         desc = get_move_desc(move)
         end, buyao = self.__common_step(move, desc)
         return move, desc, end, buyao
 
+
 class ManualAgent(Agent):
-    def step(self):
+    def step(self, state):
         print("Player {}  ".format(self.player_id), end=' ')
         #输入举例: [9] 或 [10]*4 + [11]*2 等。不要或要不起输入[]
         desc = None
         while desc is None:
             move = eval(input())
-            desc = self.get_move_desc(move)
+            desc = get_move_desc(move)
             #todo: 检查已出牌数量
             if desc is not None:
                 end, buyao = self.__common_step(move, desc)

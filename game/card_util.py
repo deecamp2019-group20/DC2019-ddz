@@ -188,16 +188,6 @@ def buyao():
     assert(len(f)==1)
     return f
 
-def card_vectorize(cards):
-    """
-    cards: defaultdict(list).
-    返回cards的vector表示，长度为15。
-    每个元素依次表示 有多少个 3/4/5.../Q/K/A/2/14/15。
-    """
-    v = []
-    for n in card:
-        v.append(len(cards[n]))
-    return v
 
 def calc_key(row):
     s=[]
