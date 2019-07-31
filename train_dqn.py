@@ -19,7 +19,7 @@ if __name__ == "__main__":
         game.show()
         record = deque()
         for i in range(100):
-            pid, state, move, desc, winner = game.step()
+            pid, state, moves, move, desc, winner = game.step()
 
             if len(record)==len(game.players):
                 p = record.popleft()

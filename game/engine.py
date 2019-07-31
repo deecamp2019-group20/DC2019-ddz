@@ -29,10 +29,10 @@ class GameState():
 class Game(object):
     def __init__(self, agents: List['Agent']):
         # 初始化players
-        self.game_reset()
         self.players = agents
         for p in agents:
             p.game = self
+        self.game_reset()
 
     def get_state(self)->GameState:
         state = GameState()
@@ -86,7 +86,7 @@ class Game(object):
     #游戏进行    
     def step(self):
         player = self.players[self.index]
-        state, cur_move, cur_desc, self.end = player.step(self.get_state()) #返回：在状态state下，当前玩家的出牌、出牌描述、游戏是否结束
+        state, cur_moves, cur_move, cur_desc, self.end = player.step(self.get_state()) #返回：在状态state下，当前玩家的出牌、出牌描述、游戏是否结束
         if len(cur_move)==0:
             self.yaobuqis.append(self.index)
         else:
@@ -113,8 +113,7 @@ class Game(object):
             #playrecords.show("=============Round " + str(playround) + " Start=============")
             self.index = 0
         
-        #todo: return more information
-        return player.player_id, state, cur_move, cur_desc, winner
+        return player.player_id, state, cur_moves, cur_move, cur_desc, winner
 
     def show(self):
         for i in range(len(self.players)):
@@ -341,11 +340,12 @@ class Agent(object):
 
     # 出牌
     def step(self, state):
+        self.moves = self.get_moves(self.game.last_move, self.game.last_desc)
         self.state = state
         self.move = self.choose(state)
         self.desc = get_move_desc(self.move)
         end = self.__common_step(self.move, self.desc)
-        return state, self.move, self.desc, end
+        return state, self.moves, self.move, self.desc, end
 
 
 class ManualAgent(Agent):

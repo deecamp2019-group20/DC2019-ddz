@@ -31,7 +31,7 @@ name_to_rank = {'3':1, '4':2, '5':3, \
 type_encoding = {'buyao':0, 'dan':1, 'dui':2, 'san':3, 'san_yi':4, 'san_er':5, \
                  'dan_shun':6, 'er_shun':7, 'feiji':8, 'xfeiji':9, 'dfeiji':10, \
                  'zha':11, 'si_erdan':12, 'si_erdui':13, 'wangzha':14}
-inv_type_encoding = {v:k for k,v in type_encoding}
+inv_type_encoding = {v:k for k,v in type_encoding.items()}
 
 # [---name---] main type sum
 
