@@ -108,9 +108,7 @@ class Game(object):
         self.index = self.index + 1
         #一轮结束
         if self.index >= len(self.players):
-            #playrecords.show("=============Round " + str(playround) + " End=============")
             self.playround = self.playround + 1
-            #playrecords.show("=============Round " + str(playround) + " Start=============")
             self.index = 0
         
         return player.player_id, state, cur_moves, cur_move, cur_desc, winner
@@ -272,7 +270,7 @@ class Agent(object):
         self.player_id = player_id  # 0代表地主，1代表地主下家，2代表地主上家
         self.__cards_left = defaultdict(list)  # e.g. {'3':[cards], ...}
         self.game = None
-        self.moves = None
+        self.moves = None  # pd.DataFrame，保存能够出的牌。
         self.state = None  # 当前游戏状态
 
     def set_hand_card(self, cards):
@@ -340,12 +338,21 @@ class Agent(object):
 
     # 出牌
     def step(self, state):
-        self.moves = self.get_moves(self.game.last_move, self.game.last_desc)
+        self.move_list = self.get_moves(self.game.last_move, self.game.last_desc)
         self.state = state
         self.move = self.choose(state)
         self.desc = get_move_desc(self.move)
         end = self.__common_step(self.move, self.desc)
-        return state, self.moves, self.move, self.desc, end
+        return state, self.move_list, self.move, self.desc, end
+
+    def observation(self):
+        return self.game.get_state(), self.get_moves(self.game.last_move, self.game.last_desc)
+    def do_action(self, move):
+        self.move = move
+        self.desc = get_move_desc(self.move)
+        end = self.__common_step(self.move, self.desc)
+        return self.move, self.desc, end
+               
 
 
 class ManualAgent(Agent):

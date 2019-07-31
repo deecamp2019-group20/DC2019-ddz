@@ -5,7 +5,7 @@ import numpy as np
 
 class RandomModel(Agent):
     def choose(self, state):
-        valid_moves = self.moves()
+        valid_moves = self.move_list
 
         # player i [手牌] // [出牌]
         hand_card = []
@@ -25,12 +25,12 @@ class RandomModel(Agent):
 
 if __name__=="__main__":
     game = Game([RandomModel(i) for i in range(3)])
-    
+
     for i_episode in range(1):
         game.game_reset()
         game.show()
         for i in range(100):
-            winner = game.step()
+            pid, state, cur_moves, cur_move, cur_desc, winner = game.step()
             #game.show()
             if winner != -1:
                 print('Winner:{}'.format(winner))

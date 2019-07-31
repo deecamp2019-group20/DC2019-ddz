@@ -33,12 +33,12 @@ type_encoding = {'buyao':0, 'dan':1, 'dui':2, 'san':3, 'san_yi':4, 'san_er':5, \
                  'zha':11, 'si_erdan':12, 'si_erdui':13, 'wangzha':14}
 inv_type_encoding = {v:k for k,v in type_encoding.items()}
 
-# [---name---] main type sum
+# [---name---] main type sum kicker
 
 def dan():
     f = pd.DataFrame(columns=card, dtype=int)
     for k in card:
-        f = f.append({k:1, 'main':name_to_rank[k]}, ignore_index=True)
+        f = f.append({k:1, 'main':name_to_rank[k], 'kicker':[]}, ignore_index=True)
     f['type'] = 'dan'
     assert(len(f)==15)
     return f
@@ -46,7 +46,7 @@ def dan():
 def dui():
     f = pd.DataFrame(columns=card, dtype=int)
     for k in card[:-2]:
-        f = f.append({k:2, 'main':name_to_rank[k]}, ignore_index=True)
+        f = f.append({k:2, 'main':name_to_rank[k], 'kicker':[]}, ignore_index=True)
     f['type'] = 'dui'
     assert(len(f)==13)
     return f
@@ -54,7 +54,7 @@ def dui():
 def san():
     f = pd.DataFrame(columns=card, dtype=int)
     for k in card[:-2]:
-        f = f.append({k:3, 'main':name_to_rank[k]}, ignore_index=True)
+        f = f.append({k:3, 'main':name_to_rank[k], 'kicker':[]}, ignore_index=True)
     f['type'] = 'san'
     assert(len(f)==13)
     return f
@@ -65,7 +65,7 @@ def san_yi():
     for k in card[:-2]:
         comb = combinations(list(set(card)-{k}), 1)
         for c in comb:
-            f = f.append({k:3, c[0]:1, 'main':name_to_rank[k]}, ignore_index=True)
+            f = f.append({k:3, c[0]:1, 'main':name_to_rank[k], 'kicker':[c[0]]}, ignore_index=True)
     f['type'] = 'san_yi'
     assert(len(f)==182)
     return f
@@ -76,7 +76,7 @@ def san_er():
         comb = combinations(list(set(card[:-2])-{k}), 1)
         for c in comb:
             if c[0]!=k:
-                f = f.append({k:3, c[0]:2, 'main':name_to_rank[k]}, ignore_index=True)
+                f = f.append({k:3, c[0]:2, 'main':name_to_rank[k], 'kicker':[c[0]]}, ignore_index=True)
     f['type'] = 'san_er'
     assert(len(f)==156)
     return f
@@ -88,6 +88,7 @@ def dan_shun():
             sli = card[i: i+L]
             data = {k:1 for k in sli}
             data['main'] = name_to_rank[sli[0]]
+            data['kicker'] = [sli[-1]]
             f = f.append(data, ignore_index=True)
     f['type'] = 'dan_shun'
     assert(len(f)==36)
@@ -100,6 +101,7 @@ def er_shun():
             sli = card[i: i+L]
             data = {k:2 for k in sli}
             data['main'] = name_to_rank[sli[0]]
+            data['kicker'] = [sli[-1]]
             f = f.append(data, ignore_index=True)
     f['type'] = 'er_shun'
     assert(len(f)==52)
@@ -112,6 +114,7 @@ def feiji():
             sli = card[i: i+L]
             data = {k:3 for k in sli}
             data['main'] = name_to_rank[sli[0]]
+            data['kicker'] = [sli[-1]]
             f = f.append(data, ignore_index=True)
     f['type'] = 'feiji'
     assert(len(f)==45)
@@ -128,6 +131,7 @@ def xfeiji():
                 data = {k:1 for k in c}
                 data.update( {k:3 for k in sli} )
                 data['main'] = name_to_rank[sli[0]]
+                data['kicker'] = list(c)
                 f = f.append(data, ignore_index=True)
     f['type'] = 'xfeiji'
     assert(len(f)==8044)
@@ -143,6 +147,7 @@ def dfeiji():
                 data = {k:2 for k in c}
                 data.update( {k:3 for k in sli} )
                 data['main'] = name_to_rank[sli[0]]
+                data['kicker'] = list(c)
                 f = f.append(data, ignore_index=True)
     f['type'] = 'dfeiji'
     assert(len(f)==2939)
@@ -151,7 +156,7 @@ def dfeiji():
 def zha():
     f = pd.DataFrame(columns=card, dtype=int)
     for k in card[:-2]:
-        f = f.append({k:4, 'main':name_to_rank[k]}, ignore_index=True)
+        f = f.append({k:4, 'main':name_to_rank[k], 'kicker':[]}, ignore_index=True)
     f['type'] = 'zha'
     assert(len(f)==13)
     return f
@@ -161,7 +166,7 @@ def si_erdan():
     for k in card[:-2]:
         comb = combinations(list( set(card)-{k} ), 2)
         for c in comb:
-            f = f.append({k:4, c[0]:1, c[1]:1, 'main':name_to_rank[k]}, ignore_index=True)
+            f = f.append({k:4, c[0]:1, c[1]:1, 'main':name_to_rank[k], 'kicker':list(c)}, ignore_index=True)
     f['type'] = 'si_erdan'
     assert(len(f)==1183)
     return f
@@ -171,23 +176,23 @@ def si_erdui():
     for k in card[:-2]:
         comb = combinations(list( set(card[:-2])-{k} ), 2)
         for c in comb:
-            f = f.append({k:4, c[0]:2, c[1]:2, 'main':name_to_rank[k]}, ignore_index=True)
+            f = f.append({k:4, c[0]:2, c[1]:2, 'main':name_to_rank[k], 'kicker':list(c)}, ignore_index=True)
     f['type'] = 'si_erdui'
     assert(len(f)==858)
     return f
 
 def wangzha():
     f = pd.DataFrame(columns=card, dtype=int)
-    f = f.append({'14':1, '15':1, 'main':16}, ignore_index=True)
+    f = f.append({'14':1, '15':1, 'main':16, 'kicker':[]}, ignore_index=True)
     f['type'] = 'wangzha'
     assert(len(f)==1)
     return f
 
 def buyao():
     f = pd.DataFrame(columns=card, dtype=int)
-    f = f.append({k:0 for k in card}, ignore_index=True)
-    f['main'] = 0
-    f['type'] = 'buyao'
+    data = {k:0 for k in card}
+    data.update({'main':0, 'type':'buyao', 'kicker':[]})
+    f = f.append(data, ignore_index=True)
     assert(len(f)==1)
     return f
 
@@ -203,14 +208,14 @@ def calc_key(row):
 if exists(  join(dirname(abspath(__file__)), "patterns.csv")  ):
     All = pd.read_csv(join(dirname(abspath(__file__)), "patterns.csv")).fillna(0)
 else:
-    All = pd.concat([dan(), dui(), san(), san_yi(), san_er(), 
+    tmp = pd.concat([dan(), dui(), san(), san_yi(), san_er(), 
                      dan_shun(), er_shun(), feiji(), xfeiji(), dfeiji(), 
                      zha(), si_erdan(), si_erdui(), wangzha(), buyao()], axis=0, sort=False).fillna(0)
-    All['sum'] = All[card].sum(axis=1)
-    tp = All['type']
-    All=All.drop('type', axis=1).astype(int)
-    All['type'] = tp
+    tmp['sum'] = tmp[card].sum(axis=1)
 
+    All = tmp.drop(['type', 'kicker'], axis=1).astype(int)
+    All['type'] = tmp['type']
+    All['kicker'] = tmp['kicker']
     All['key'] = All.apply(calc_key, axis=1)
 
     All.to_csv(join(dirname(abspath(__file__)), "patterns.csv"), index=False)
