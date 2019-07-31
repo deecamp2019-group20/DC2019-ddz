@@ -1,7 +1,5 @@
-from __future__ import absolute_import
-
 import sys
-from engine import Agent, Game, ManualAgent, Card
+from game.engine import Agent, Game, ManualAgent, Card
 import numpy as np
 
 
@@ -25,16 +23,16 @@ class RandomModel(Agent):
         return move
 
 
-
-game = Game([RandomModel(i) for i in range(3)])
-
-for i_episode in range(1):
-    game.game_reset()
-    game.show()
-    for i in range(100):
-        winner = game.step()
-        #game.show()
-        if winner != -1:
-            print('Winner:{}'.format(winner))
-            break
+if __name__=="__main__":
+    game = Game([RandomModel(i) for i in range(3)])
     
+    for i_episode in range(1):
+        game.game_reset()
+        game.show()
+        for i in range(100):
+            winner = game.step()
+            #game.show()
+            if winner != -1:
+                print('Winner:{}'.format(winner))
+                break
+        

@@ -2,15 +2,14 @@
 """
 自定义相关类
 """
-from __future__ import absolute_import
-
-from gameutil import card_show
 import numpy as np
 from typing import List, Tuple, Dict
 import pandas as pd
 from collections import defaultdict
-from card_util import All as backup
 from os.path import join, abspath, dirname
+from .card_util import All as backup
+from .gameutil import card_show
+from copy import copy
 
 
 ############################################
@@ -24,17 +23,17 @@ class GameState():
         self.down_out = None
         self.self_out = None
         self.other_hand = None
-
+        self.last_move = None # 上一个有效出牌，[]表示主动权
+        self.last_desc = None # 上一个有效出牌的描述
 
 class Game(object):
     def __init__(self, agents: List['Agent']):
         # 初始化players
-        self.players = []
+        self.game_reset()
+        self.players = agents
         for p in agents:
             p.game = self
-            self.players.append(p)
-        self.game_reset()
-        
+
     def get_state(self)->GameState:
         state = GameState()
         state.hand = Card.vectorize_card_dict(self.players[self.index].get_hand_card())
@@ -43,6 +42,7 @@ class Game(object):
         state.down_out = tmp[self.get_down_index()]
         state.self_out = tmp[self.index]
         state.other_hand = (np.array([4]*13+[1,1]) - state.hand - state.out).tolist()
+        state.last_move = self.last_move
         return state
 
     def get_up_index(self):
@@ -72,7 +72,8 @@ class Game(object):
 
         #play相关参数
         self.end = False    # 游戏是否结束
-        self.last_desc = self.last_move = None
+        self.last_desc = None
+        self.last_move = []
         self.playround = 1  # 回合数
         self.index = 0  # 当前玩家的id，0代表地主，1代表地主下家，2代表地主上家
         self.yaobuqis = []
@@ -84,8 +85,9 @@ class Game(object):
     
     #游戏进行    
     def step(self):
-        cur_move, cur_desc, self.end, buyao = self.players[self.index].step(self.get_state())
-        if buyao:
+        player = self.players[self.index]
+        state, cur_move, cur_desc, self.end = player.step(self.get_state()) #返回：在状态state下，当前玩家的出牌、出牌描述、游戏是否结束
+        if len(cur_move)==0:
             self.yaobuqis.append(self.index)
         else:
             self.yaobuqis = []
@@ -96,7 +98,8 @@ class Game(object):
         #都要不起
         if len(self.yaobuqis) == len(self.players)-1:
             self.yaobuqis = []
-            self.last_desc = self.last_move = None
+            self.last_desc = None
+            self.last_move = []
 
         winner = -1
         if self.end:
@@ -111,7 +114,7 @@ class Game(object):
             self.index = 0
         
         #todo: return more information
-        return winner
+        return player.player_id, state, cur_move, cur_desc, winner
 
     def show(self):
         for i in range(len(self.players)):
@@ -126,7 +129,7 @@ class Card(object):
     扑克牌类
     """
     color_show = {}
-#    color_show = {'a': '♠', 'b':'♥', 'c':'♣', 'd':'♦'}
+    #color_show = {'a': '♠', 'b':'♥', 'c':'♣', 'd':'♦'}
     name_show = {'11':'J', '12':'Q', '13':'K', '14':'B', '15':'R'}
     name_to_rank = {'3':1, '4':2, '5':3, \
                     '6':4, '7':5, '8':6, '9':7, '10':8, '11':9, '12':10, '13':11, \
@@ -208,14 +211,13 @@ class Card(object):
 
     def __str__(self):
         return Card.name_show.get(self.name, self.name)
-#        return Card.name_show.get(self.name, self.name) + Card.color_show.get(self.color, self.color)
+        #return Card.name_show.get(self.name, self.name) + Card.color_show.get(self.color, self.color)
     
     __repr__ = __str__
     
-
 def get_move_desc(move: List[int]):
     """
-    输入出牌， 返回牌型描述：总张数，主牌，类型
+    输入出牌， 返回牌型描述：总张数，主牌rank，类型
     """
     key = str(sorted(move))
     row = backup[ backup['key']==key ]
@@ -247,8 +249,18 @@ def get_decomposition(hand_card, last_move):
         moves = moves[ ( (moves['type']==tp)&(moves['main']>mn)&(moves['sum']==sm) )
                          | ( (moves['type']=='zha')&(moves['main']>mn) )
                          | (moves['type']=='buyao') | (moves['type']=='wangezha')  ]
+    else:
+        moves = moves[moves['type']!='buyao']
     return moves.to_dict(orient='records')
 
+def group_by_type(moves: List[Dict]):
+    """
+    输入moves， 返回按牌型分组的rank。
+    """
+    res = defaultdict(list)
+    for m in moves:
+        res[m['type']].append(m['main']-1)
+    return res
 
 ############################################
 #              玩家相关类                   #
@@ -262,6 +274,7 @@ class Agent(object):
         self.__cards_left = defaultdict(list)  # e.g. {'3':[cards], ...}
         self.game = None
         self.moves = None
+        self.state = None  # 当前游戏状态
 
     def set_hand_card(self, cards):
         self.__cards_left = defaultdict(list)  # e.g. {'3':[cards], ...}
@@ -293,7 +306,7 @@ class Agent(object):
         根据前面玩家的出牌来选牌，返回下一步所有合法出牌。
         '''
         if self.game.last_desc is None:
-            movs = self.moves
+            movs = self.moves[self.moves['type']!='buyao']
         else:
             sm, mn, tp = last_desc
             movs = self.moves[ ( (self.moves['type']==tp)&(self.moves['main']>mn)&(self.moves['sum']==sm) )
@@ -304,6 +317,12 @@ class Agent(object):
     # 模型选择如何出牌
     def choose(self, state: GameState) -> List[int]:
         return []
+
+    def learn(self, batch_size = 128, **kwargs):
+        return
+
+    def store_transition(self, *data):
+        return
 
     # 进行一步之后的公共操作
     def __common_step(self, move, move_desc):
@@ -318,15 +337,15 @@ class Agent(object):
         end = False
         if sum([len(v) for v in self.__cards_left.values()]) == 0:
             end = True
-        return end, move_desc[-1]=='buyao'
+        return end
 
     # 出牌
     def step(self, state):
-        #在next_moves中选择出牌方法
-        move = self.choose(state)
-        desc = get_move_desc(move)
-        end, buyao = self.__common_step(move, desc)
-        return move, desc, end, buyao
+        self.state = state
+        self.move = self.choose(state)
+        self.desc = get_move_desc(self.move)
+        end = self.__common_step(self.move, self.desc)
+        return state, self.move, self.desc, end
 
 
 class ManualAgent(Agent):
