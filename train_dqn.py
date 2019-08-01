@@ -19,19 +19,9 @@ if __name__ == "__main__":
         game.show()
         record = deque()
         for i in range(100):
-            pid, state, moves, move, desc, winner = game.step()
+            pid, state, moves, move, winner, info = game.step()
 
-            if len(record)==len(game.players):
-                p = record.popleft()
-                game.players[pid].store_transition(...)
-            record[pid] = (pid, state, move, desc)
 
-            if winner!=-1:
-                game.players[pid].store_transition(...)
-                while len(record)>0:
-                    p = record.pop()
-                    game.players[p.player_id].store_transition(...)
-            game.players[pid].learn()
 
             
 

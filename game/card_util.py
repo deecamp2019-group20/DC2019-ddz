@@ -1,5 +1,5 @@
 """
-                       12
+1                      12
 3 4 5 6 7 8 9 10 J Q K A   2 R B
 
 NONE
@@ -23,6 +23,7 @@ import pandas as pd
 from itertools import combinations
 from collections import defaultdict
 from os.path import join, abspath, dirname, exists
+from collections import namedtuple
 
 card = [str(i) for i in range(3, 14)] + ['1', '2', '14', '15']
 name_to_rank = {'3':1, '4':2, '5':3, \
@@ -74,7 +75,6 @@ def san():
     f['type'] = 'san'
     assert(len(f)==13)
     return f
-
 
 def san_yi():
     f = pd.DataFrame(columns=card, dtype=int)
@@ -135,7 +135,6 @@ def feiji():
     f['type'] = 'feiji'
     assert(len(f)==45)
     return f
-
 
 def xfeiji():
     f = pd.DataFrame(columns=card, dtype=int)
@@ -235,3 +234,9 @@ else:
     All['key'] = All.apply(calc_key, axis=1)
 
     All.to_csv(join(dirname(abspath(__file__)), "patterns.csv"), index=False)
+
+
+move_desc = namedtuple('move_desc', ['type', 'sum', 'main', 'kicker'])
+cache = {}
+for row in All.itertuples():
+    cache[row.key] = move_desc( type=row.type, sum=row.sum, main=row.main, kicker=eval(row.kicker) )

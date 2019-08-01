@@ -1,26 +1,23 @@
 import sys
-from game.engine import Agent, Game, ManualAgent, Card
+from game.engine import Agent, Game, Card
 import numpy as np
 
 
 class RandomModel(Agent):
     def choose(self, state):
-        valid_moves = self.move_list
+        valid_moves = self.get_moves()
 
         # player i [手牌] // [出牌]
         hand_card = []
-        for ls in self.get_hand_card().values():
-            hand_card.extend(list(ls))
+        for i, n in enumerate(Card.all_card_name):
+            hand_card.extend([n]*self.get_hand_card()[i])
         print("Player {}".format(self.player_id), ' ', hand_card, end=' // ')
 
         i = np.random.choice(len(valid_moves))
-        tmp = valid_moves[i]
-        move = []
-        for k in Card.all_card_name:
-            move.extend([int(k)]* tmp.get(k, 0))
-        print(move)
+        move = valid_moves[i]
+        print(Card.visual_card(move))
 
-        return move
+        return move, None
 
 
 if __name__=="__main__":
@@ -30,7 +27,7 @@ if __name__=="__main__":
         game.game_reset()
         game.show()
         for i in range(100):
-            pid, state, cur_moves, cur_move, cur_desc, winner = game.step()
+            pid, state, cur_moves, cur_move, winner, info = game.step()
             #game.show()
             if winner != -1:
                 print('Winner:{}'.format(winner))
