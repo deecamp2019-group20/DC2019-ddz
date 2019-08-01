@@ -28,10 +28,26 @@ card = [str(i) for i in range(3, 14)] + ['1', '2', '14', '15']
 name_to_rank = {'3':1, '4':2, '5':3, \
                 '6':4, '7':5, '8':6, '9':7, '10':8, '11':9, '12':10, '13':11, \
                 '1':12, '2':13, '14':14, '15':15}
+rank_to_name = {v:k for k,v in name_to_rank.items()}
 type_encoding = {'buyao':0, 'dan':1, 'dui':2, 'san':3, 'san_yi':4, 'san_er':5, \
                  'dan_shun':6, 'er_shun':7, 'feiji':8, 'xfeiji':9, 'dfeiji':10, \
                  'zha':11, 'si_erdan':12, 'si_erdui':13, 'wangzha':14}
 inv_type_encoding = {v:k for k,v in type_encoding.items()}
+
+all_card_type = ['1-a', '1-b','1-c','1-d',
+              '2-a', '2-b','2-c','2-d',
+              '3-a', '3-b','3-c','3-d',
+              '4-a', '4-b','4-c','4-d',
+              '5-a', '5-b','5-c','5-d',
+              '6-a', '6-b','6-c','6-d',
+              '7-a', '7-b','7-c','7-d',
+              '8-a', '8-b','8-c','8-d',
+              '9-a', '9-b','9-c','9-d',
+              '10-a', '10-b','10-c','10-d',
+              '11-a', '11-b','11-c','11-d',
+              '12-a', '12-b','12-c','12-d',
+              '13-a', '13-b','13-c','13-d',
+              '14-a', '15-a']
 
 # [---name---] main type sum kicker
 
@@ -183,7 +199,7 @@ def si_erdui():
 
 def wangzha():
     f = pd.DataFrame(columns=card, dtype=int)
-    f = f.append({'14':1, '15':1, 'main':16, 'kicker':[]}, ignore_index=True)
+    f = f.append({'14':1, '15':1, 'main':15, 'kicker':[]}, ignore_index=True)
     f['type'] = 'wangzha'
     assert(len(f)==1)
     return f

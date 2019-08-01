@@ -25,6 +25,8 @@ class GameState():
         self.other_hand = None
         self.last_move = None # 上一个有效出牌，[]表示主动权
         self.last_desc = None # 上一个有效出牌的描述
+        self.last_move_ = []
+        self.last_last_move_ = []
 
 class Game(object):
     def __init__(self, agents: List['Agent']):
@@ -43,6 +45,10 @@ class Game(object):
         state.self_out = tmp[self.index]
         state.other_hand = (np.array([4]*13+[1,1]) - state.hand - state.out).tolist()
         state.last_move = self.last_move
+        if len(self.cards_out)>=1:
+            self.last_move_ = Card.vectorized_card_list(self.cards_out[-1][-1])
+        if len(self.cards_out)>=2:
+            self.last_last_move_ = Card.vectorized_card_list(self.cards_out[-2][-1])
         return state
 
     def get_up_index(self):
@@ -86,7 +92,7 @@ class Game(object):
     #游戏进行    
     def step(self):
         player = self.players[self.index]
-        state, cur_moves, cur_move, cur_desc, self.end = player.step(self.get_state()) #返回：在状态state下，当前玩家的出牌、出牌描述、游戏是否结束
+        state, cur_moves, cur_move, cur_desc, self.end, info = player.step(self.get_state()) #返回：在状态state下，当前玩家的出牌、出牌描述、游戏是否结束
         if len(cur_move)==0:
             self.yaobuqis.append(self.index)
         else:
@@ -111,7 +117,7 @@ class Game(object):
             self.playround = self.playround + 1
             self.index = 0
         
-        return player.player_id, state, cur_moves, cur_move, cur_desc, winner
+        return player.player_id, state, cur_moves, cur_move, cur_desc, winner, info
 
     def show(self):
         for i in range(len(self.players)):
@@ -165,9 +171,9 @@ class Card(object):
         v = [0] * len(Card.all_card_name)
         for c in cards:
             if isinstance(c, int):
-                i = Card.name_to_rank[str(c)]
+                i = Card.name_to_rank[str(c)]-1
             elif isinstance(c, str):
-                i = Card.name_to_rank[c]
+                i = Card.name_to_rank[c]-1
             elif isinstance(c, Card):
                 i = c.rank-1
             else:
@@ -179,15 +185,15 @@ class Card(object):
     def vectorized_card_out(cards_out: List[Tuple[int, str, List['Card']]], total_player=3):
         cnt = {}
         for rec in cards_out:
-            a = cnt.get(rec[0], np.zeros( len(Card.all_card_name) )) # 15
-            b = np.array( Card.vectorized_card_list(rec[2])  )
+            a = cnt.get(rec[0], np.zeros( len(Card.all_card_name), dtype=int )) # 15
+            b = np.array( Card.vectorized_card_list(rec[2]), dtype=int  )
             cnt[rec[0]] = a+b
-        a = np.zeros( len(Card.all_card_name) )
+        a = np.zeros( len(Card.all_card_name), dtype=int )
         for v in cnt.values():
             a+=v
         res = []
         for i in range(total_player):
-            res.append(cnt.get(i, np.zeros( len(Card.all_card_name) )).tolist())
+            res.append(cnt.get(i, np.zeros( len(Card.all_card_name), dtype=int )).tolist())
         return res, a.tolist()
 
     @staticmethod
@@ -222,33 +228,6 @@ def get_move_desc(move: List[int]):
         return None
     i = row.index[0]
     return (row.at[i, 'sum'], row.at[i, 'main'], row.at[i, 'type'])
-
-def get_decomposition(hand_card, last_move):
-    """
-    hand_card: 长度为15的list， 每个元素分别表示手牌中有多少个3/4/5/.../A/2/14/15.
-    last_move: 上一个有效出牌，e.g. [3,3,3,2]。空表示随意出牌。
-    返回当前有效出牌， 格式：[{'3':0, '4':3, '5':1, ...}, {...}]。性能会有问题。
-    """
-    frame = backup.copy()
-    mat = frame[Card.all_card_name].values
-    enough = []
-    for i in range(len(mat)):
-        if all(np.greater_equal(hand_card, mat[i])):
-            enough.append(True)
-        else:
-            enough.append(False)
-    frame['enough'] = enough
-    moves = frame[frame['enough']]
-
-    if len(last_move)>0:
-        last_desc = get_move_desc(last_move)
-        sm, mn, tp = last_desc
-        moves = moves[ ( (moves['type']==tp)&(moves['main']>mn)&(moves['sum']==sm) )
-                         | ( (moves['type']=='zha')&(moves['main']>mn) )
-                         | (moves['type']=='buyao') | (moves['type']=='wangezha')  ]
-    else:
-        moves = moves[moves['type']!='buyao']
-    return moves.to_dict(orient='records')
 
 def group_by_type(moves: List[Dict]):
     """
@@ -312,8 +291,8 @@ class Agent(object):
         return movs.to_dict(orient='records')
     
     # 模型选择如何出牌
-    def choose(self, state: GameState) -> List[int]:
-        return []
+    def choose(self, state: GameState) -> Tuple[List[int], object]:
+        return [], None
 
     def learn(self, batch_size = 128, **kwargs):
         return
@@ -340,19 +319,14 @@ class Agent(object):
     def step(self, state):
         self.move_list = self.get_moves(self.game.last_move, self.game.last_desc)
         self.state = state
-        self.move = self.choose(state)
+        self.move, info = self.choose(state)
         self.desc = get_move_desc(self.move)
         end = self.__common_step(self.move, self.desc)
-        return state, self.move_list, self.move, self.desc, end
+        return state, self.move_list, self.move, self.desc, end, info
 
     def observation(self):
         return self.game.get_state(), self.get_moves(self.game.last_move, self.game.last_desc)
-    def do_action(self, move):
-        self.move = move
-        self.desc = get_move_desc(self.move)
-        end = self.__common_step(self.move, self.desc)
-        return self.move, self.desc, end
-               
+
 
 
 class ManualAgent(Agent):
