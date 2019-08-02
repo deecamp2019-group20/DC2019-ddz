@@ -23,7 +23,7 @@ class GameState():
         self.down_out = None
         self.self_out = None
         self.other_hand = None
-        self.last_move = None # 上一个有效出牌，全零表示主动权
+        self.last_move = [0]*15 # 上一个有效出牌，全零表示主动权
         self.last_pid = -1 # 上一个有效出牌的玩家编号，-1表示主动权
         self.last_move_ = np.zeros(15, dtype=int)  # 上一个出牌，不管有效与否
         self.last_last_move_ = np.zeros(15, dtype=int) # 上上个出牌，不管有效与否
@@ -268,15 +268,15 @@ class Agent(object):
     def choose(self, state: GameState) -> Tuple[List[int], object]:
         return [], None
 
-    def learn(self, batch_size = 128, **kwargs):
-        return
-
-    def store_transition(self, *data):
-        return
-
     # 进行一步之后的公共操作
     def __common_step(self, move):
         #移除出掉的牌; 记录
+        try:
+            assert( np.all(self.__cards_left>=move)  )
+        except AssertionError:
+            print("手牌：", self.__cards_left)
+            print("出牌：", move)
+            raise AssertionError()
         self.__cards_left -= move
         self.game.cards_out.append( (self.player_id, move) )
 
@@ -288,10 +288,10 @@ class Agent(object):
 
     # 出牌
     def step(self, state):
-        move_list = self.get_moves()
+        self.move_list = self.get_moves() # 可在self.choose里使用
         move, info = self.choose(state)
         end = self.__common_step(move)
-        return state, move_list, move, end, info
+        return state, self.move_list, move, end, info
 
     def observation(self):
         return self.game.get_state(), self.get_moves()
