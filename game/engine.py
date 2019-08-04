@@ -273,6 +273,7 @@ class Agent(object):
         #移除出掉的牌; 记录
         try:
             assert( np.all(self.__cards_left>=move)  )
+            assert( np.all(self.__cards_left[:-2]<=4) and np.all(self.__cards_left[-2:])<=1 )
         except AssertionError:
             print("手牌：", self.__cards_left)
             print("出牌：", move)
