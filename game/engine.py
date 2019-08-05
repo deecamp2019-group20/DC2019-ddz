@@ -38,18 +38,18 @@ class Game(object):
 
     def get_state(self)->GameState:
         state = GameState()
-        state.hand = self.players[self.index].get_hand_card()
+        state.hand = self.players[self.index].get_hand_card().copy()
         tmp, state.out = Card.vectorized_card_out(self.cards_out, len(self.players))
         state.up_out = tmp[self.get_up_index()]
         state.down_out = tmp[self.get_down_index()]
         state.self_out = tmp[self.index]
         state.other_hand = (np.array([4]*13+[1,1]) - state.hand - state.out).tolist()
-        state.last_move = self.last_move
+        state.last_move = self.last_move.copy()
         state.last_pid = self.last_pid
         if len(self.cards_out)>=1:
-            self.last_move_ = self.cards_out[-1][-1]
+            self.last_move_ = self.cards_out[-1][-1].copy()
         if len(self.cards_out)>=2:
-            self.last_last_move_ = self.cards_out[-2][-1]
+            self.last_last_move_ = self.cards_out[-2][-1].copy()
         return state
 
     def get_up_index(self):
@@ -93,7 +93,8 @@ class Game(object):
     #游戏进行    
     def step(self):
         player = self.players[self.index]
-        state, cur_moves, cur_move, self.end, info = player.step(self.get_state()) #返回：在状态state下，当前玩家的出牌列表、游戏是否结束、choose自定义返回值
+        state = self.get_state()
+        state, cur_moves, cur_move, self.end, info = player.step(state) #返回：在状态state下，当前玩家的出牌列表、游戏是否结束、choose自定义返回值
         if sum(cur_move)==0:
             self.yaobuqis.append(self.index)
             #都要不起

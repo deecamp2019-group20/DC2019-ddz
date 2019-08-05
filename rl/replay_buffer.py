@@ -44,7 +44,7 @@ class ReplayBufferHER(ReplayBuffer):
     def update_memory(self):
         self.memory.extend(self.round_exp)
         for t in range(len(self.round_exp)):
-            for k in range(self.K):
+            for _ in range(self.K):
                 future = np.random.randint(t, len(self.round_exp))
                 goal = self.round_exp[future][3]  # next_state of future
                 state = self.round_exp[t][0]

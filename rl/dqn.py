@@ -2,11 +2,65 @@ from game.engine import Agent, Card
 import numpy as np
 from keras.models import Sequential, Model
 from keras.layers import *
-from keras import backend as K
+from keras import backend as KTF
 import random
 from collections import deque, defaultdict
 import pickle as pkl
 import os
+
+
+def list_to_mat(lst):
+    m = np.zeros((15,4))
+    for i in range(len(lst)):
+        if lst[i]>0:
+            m[i, :lst[i]] = 1
+    return m
+
+def state_to_tensor(state):
+    S = []
+    S.append(list_to_mat(state.hand))
+    S.append(list_to_mat(state.out))
+    #S.append(list_to_mat(state.self_out))
+    #S.append(list_to_mat(state.up_out))
+    #S.append(list_to_mat(state.down_out))
+    #S.append(list_to_mat(state.other_hand))
+    S.append(list_to_mat(state.last_move))
+    S.append(list_to_mat([4]*13+[1,1]))
+    S = np.array(S).transpose([1,2,0])
+    return S   # 15*4*8
+
+def make_input(state, move_list, goal=None):
+    S = np.array([state]*len(move_list))
+    M = np.array([list_to_mat(m) for m in move_list])
+    if goal is not None:
+        G = np.array([goal]*len(move_list))
+        return [S, M, G]
+    return [S, M]
+
+class ReplayBuffer():
+    def __init__(self, maxlen=None):
+        self.memory = deque(maxlen=maxlen)
+        self.maxlen = maxlen
+        self.round_exp = []
+    
+    def __len__(self):
+        return len(self.memory)
+
+    def remember(self, *data):
+        state, action, reward, next_state, next_action, done = data
+        self.round_exp.append([state, action, reward, next_state, next_action, done])
+
+    def sample(self, batch_size):
+        batch = random.sample(self.memory, batch_size)
+        batch = list(zip(*batch))
+        data = []
+        for i in range(len(batch)):
+            data.append(np.asarray(batch[i]))
+        return data
+
+    def update_memory(self):
+        self.memory.extend(self.round_exp)
+        self.round_exp = []
 
 class ReplayBufferHER():
     def __init__(self, maxlen=None, K=4):
@@ -35,64 +89,21 @@ class ReplayBufferHER():
         for t in range(len(self.round_exp)):
             for k in range(self.K):
                 future = np.random.randint(t, len(self.round_exp))
-                goal = self.round_exp[future][3].hand  # next_state of future
+                goal = self.round_exp[future][3][:, :, 0]  # next_state of future
                 state = self.round_exp[t][0]
                 move = self.round_exp[t][1]
                 next_state = self.round_exp[t][3]
                 next_move = self.round_exp[t][4]
-                done = np.array_equal(next_state.hand, goal)
+                done = np.array_equal(next_state[:, :, 0], goal)
                 reward = 100 if done else -100
                 self.memory.append([state, move, reward, next_state, next_move, goal, done])
 
         self.round_exp = []
 
-def list_to_mat(lst):
-    m = np.zeros((15,4))
-    for i in range(len(lst)):
-        if lst[i]>0:
-            m[i, :lst[i]] = 1
-    return m
-
-def state_to_tensor(state):
-    S = []
-    S.append(list_to_mat(state.out))
-    S.append(list_to_mat(state.hand))
-    S.append(list_to_mat(state.self_out))
-    S.append(list_to_mat(state.up_out))
-    S.append(list_to_mat(state.down_out))
-    S.append(list_to_mat(state.other_hand))
-    S.append(list_to_mat(state.last_move))
-    S.append(list_to_mat([4]*13+[1,1]))
-    # S: 8*15*4
-    return S
-
-
-def merge_input(state_batch, moves_batch, goal_batch):
-    #state -> matrix
-    S_batch = []
-    for state in state_batch:
-        S_batch.append(state_to_tensor(state)) # S_batch: None*7*15*4
-
-    data = []
-    for i in range(len(S_batch)):
-        for j in range(len(moves_batch[i])):
-            a = np.array(S_batch[i]+[ list_to_mat(moves_batch[i][j]), list_to_mat(goal_batch[i]) ])# a: 10*15*4
-            data.append( np.transpose(a, [1,2,0]) ) #trans a: 15*4*10
-    return np.array(data) #data: None*15*4*10
-
-def make_qnet_input(state_batch, move_batch, goal_batch):
-    S_batch = []
-    for i in range(len(state_batch)):
-        tmp = state_to_tensor(state_batch[i]) # tmp: 8*15*4
-        tmp+=[ list_to_mat(move_batch[i]), list_to_mat(goal_batch[i]) ] 
-        S_batch.append( tmp )# append: 10*15*4
-    a = np.array(S_batch) #a: None*10*15*4
-    return np.transpose(a, [0,2,3,1])   #return: None*15*4*10
-
-
 class DQNModel():
     def __init__(self, epsilon=1.0, min_epsilon = 0.02, epsilon_decay=0.99, gamma=0.95, buf_size=10000, step_per_update = 10, weight_blend = 0.8):
-        self.buf = ReplayBufferHER(buf_size)
+        self.buf = ReplayBuffer(buf_size)
+        self.use_HER = False
         self.max_epsilon = self.epsilon = epsilon
         self.min_epsilon = min_epsilon
         self.epsilon_decay = epsilon_decay
@@ -103,46 +114,65 @@ class DQNModel():
         self.__J = 0
 
     def __build_model(self):
-        def build_net():
-            In = Input(shape=(15, 4, 10))
-            conv1 = Conv2D(128, (1, 4), activation='relu', padding='SAME')(In)
-            conv2 = Conv2D(128, (3, 4), activation='relu', padding='SAME')(In)
-            conv5 = Conv2D(128, (5, 4), activation='relu', padding='SAME')(In)
-            conv9 = Conv2D(128, (9, 4), activation='relu', padding='SAME')(In)
-            conv15 =Conv2D(128, (15,4), activation='relu', padding='SAME')(In)
-            conc = Concatenate()([conv1, conv2, conv5, conv9, conv15])  #None x 15 x 4 x all channel
-            conv1x1 = Conv2D(512, (1,1))(conc)
-            bnorm = BatchNormalization()(conv1x1)
-            acti = Activation('relu')(bnorm)
-            out = Flatten()(acti)
-            out = Dense(128, activation='relu')(out)
+        def bottleneck(inp, channels, use_shortcut = False):
+            in_shape = KTF.int_shape(inp)
+            conv1 = Conv2D(channels, (2,2), activation='relu', padding='same')(inp)
+            conv2 = Conv2D(channels, (2,2), activation='relu', padding='same')(conv1)
+            if use_shortcut:
+                shortcut = inp
+                if in_shape[3]!=channels:
+                    shortcut = Conv2D(channels, (1,1))(inp)
+                plus = Add()([conv2, shortcut])
+                return Activation('relu')(plus)
+            return conv2
+
+        def build_net(use_HER):
+            state_in = Input(shape=(15, 4, 4))
+            action_in = Input(shape=(15, 4))
+            action = Reshape((15, 4, 1))(action_in)
+            if use_HER:
+                goal_in = Input(shape=(15, 4))
+                goal = Reshape((15, 4, 1))(goal_in)
+                In = Concatenate()([state_in, action, goal])
+                inputs = [state_in, action_in, goal_in]
+            else:
+                In = Concatenate()([state_in, action])
+                inputs = [state_in, action_in]
+
+            conv1 = Conv2D(256, (1,1), strides=(1,4))(In)
+            conv2 = Conv2D(256, (1,2), strides=(1,4))(In)
+            conv3 = Conv2D(256, (1,3), strides=(1,4))(In)
+            conv4 = Conv2D(256, (1,4), strides=(1,4))(In)
+            conca = Concatenate(axis=-2)([conv1, conv2, conv3, conv4])
+            pool = MaxPool2D((1,4))(conca)
+            out = Flatten()(pool)
+            out = Dropout(0.5)(out)
+            out = Dense(256)(out)
             out = Dense(1)(out)
-            m = Model(inputs=[In], outputs=[out])
+            m = Model(inputs=inputs, outputs=[out])
             return m
-        qnet = build_net()
+        qnet = build_net(self.use_HER)
         qnet.compile(loss='mse', optimizer='adam')
-        tnet = build_net()
+        tnet = build_net(self.use_HER)
         tnet.set_weights(qnet.get_weights())
         tnet.trainable = False
         qnet.summary()
         return qnet, tnet
 
-    def choose_action(self, state, valid_actions, goal, ignore_eps=False):
+    def choose_action(self, state, valid_actions, goal=None, ignore_eps=False):
         if not ignore_eps and np.random.rand()<self.epsilon:
             i = np.random.choice(len(valid_actions))
             return valid_actions[i]
-        inputs = merge_input([state], [valid_actions], [goal])
-        q = self.qnet.predict(inputs).reshape(-1,)
+        q = self.qnet.predict(make_input(state, valid_actions, goal)).reshape(-1,)
         i = np.argmax(q)
         return valid_actions[i]
 
     def learn(self, batch_size):
-        state, move, reward, next_state, next_move, goal, done = self.buf.sample(batch_size)
-        tinputs = make_qnet_input(next_state, next_move, goal)
-        q_hat = self.tnet.predict(tinputs).reshape(-1,)
+        state, move, reward, next_state, next_move, done = self.buf.sample(batch_size)
+        q_hat = self.tnet.predict([next_state, next_move]).reshape(-1,)
         target = reward + (1.0-done)*self.gamma*q_hat
 
-        self.qnet.train_on_batch(make_qnet_input(state, move, goal), target)
+        self.qnet.train_on_batch([state, move], target)
         self.__J+=1
         if self.__J>=self.step_per_update:
             self.__J = 0
@@ -166,7 +196,7 @@ class DQNAgent(Agent):
 
     def choose(self, state):
         move_list = self.move_list
-        res = self.model.choose_action(state, move_list, [0]*15)
+        res = self.model.choose_action(state_to_tensor(state), move_list)
         if os.path.exists( os.path.join(os.path.dirname(os.path.dirname(__file__)), 'test')):
             # player i [手牌] // [出牌]
             hand_card = []
