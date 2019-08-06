@@ -2,18 +2,13 @@ import sys
 from game.engine import Agent, Game, Card
 import numpy as np
 
-
 class RandomModel(Agent):
     def choose(self, state):
         valid_moves = self.get_moves()
         i = np.random.choice(len(valid_moves))
         move = valid_moves[i]
-
         # player i [手牌] // [出牌]
-        hand_card = []
-        for i, n in enumerate(Card.all_card_name):
-            hand_card.extend([n]*self.get_hand_card()[i])
-        print("Player {}".format(self.player_id), ' ', hand_card, ' // ', Card.visual_card(move))
+        print("RAN Player {}".format(self.player_id), ' ', Card.visual_card(self.get_hand_card()), ' // ', Card.visual_card(move))
 
         return move, None
 

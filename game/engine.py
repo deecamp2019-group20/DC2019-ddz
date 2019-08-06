@@ -6,10 +6,7 @@ import numpy as np
 from typing import List, Tuple, Dict
 import pandas as pd
 from collections import defaultdict
-from os.path import join, abspath, dirname
 from .card_util import All as backup, cache
-from .gameutil import card_show
-from copy import copy
 from .r import get_moves
 
 ############################################
@@ -121,7 +118,7 @@ class Game(object):
 
     def show(self):
         for i in range(len(self.players)):
-            card_show(self.players[i].get_hand_card(), "Player {}".format(i), 1)
+            print("Player {}".format(i), ' ', Card.visual_card(self.players[i].get_hand_card()))
 
 ############################################
 #              扑克牌相关类                 #

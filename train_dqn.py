@@ -1,16 +1,14 @@
 from game.engine import Game, Agent, Card
-from rl.dqn import DQNAgent, DQNModel, list_to_mat, state_to_tensor, make_input
+from rl_model.dqn import DQNAgent, DQNModel, list_to_mat, state_to_tensor, make_input
 from collections import deque
 import numpy as np
 import tensorflow as tf
 import datetime as dt
 import os
 
-
 MAX_EPISODE = 50000
 BATCH_SIZE = 64
 MIN_BUFSIZE = 3*BATCH_SIZE
-
 
 config = tf.ConfigProto()
 config.gpu_options.allow_growth = True
@@ -23,15 +21,12 @@ class RandomModel(Agent):
         move = valid_moves[i]
         if os.path.exists("test"):
             # player i [手牌] // [出牌]
-            hand_card = []
-            for i, n in enumerate(Card.all_card_name):
-                hand_card.extend([n]*self.get_hand_card()[i])
-            print("Random Player {}".format(self.player_id), ' ', hand_card, ' // ', Card.visual_card(move))
+            print("RAN Player {}".format(self.player_id), ' ', Card.visual_card(self.get_hand_card()), ' // ', Card.visual_card(move))
 
         return move, None
 
 def train_lord():
-    rl_model = DQNModel(step_per_update = 40, buf_size=40000, min_epsilon = 0.05, epsilon=0.5)
+    rl_model = DQNModel( (15,4,8), step_per_update = 40, buf_size=40000, min_epsilon = 0.05, epsilon=0.5)
     game = Game([DQNAgent(0, rl_model)] + [RandomModel(i) for i in range(1,3)])
     wins = deque(maxlen=100)
 
@@ -74,8 +69,10 @@ def train_lord():
         rl_model.buf.update_memory()
         rl_model.update_epsilon(i_episode, MAX_EPISODE)
         wins.append( lord_win==True )
-        if i_episode % 10==0:
+        if i_episode % 100==0:
             print(dt.datetime.now(),  " Episode: {}, lord win rate: {}, eps: {}".format(i_episode, sum(wins)/len(wins), rl_model.epsilon) )
+        if i_episode % 500==0:
+            rl_model.save()
         if os.path.exists('test'):
             print(lord_win, ' ', pes_win)
             input()

@@ -1,6 +1,6 @@
 from game.engine import Agent, Card
 import numpy as np
-from keras.models import Sequential, Model
+from keras.models import Sequential, Model, load_model
 from keras.layers import *
 from keras import backend as KTF
 import random
@@ -20,10 +20,10 @@ def state_to_tensor(state):
     S = []
     S.append(list_to_mat(state.hand))
     S.append(list_to_mat(state.out))
-    #S.append(list_to_mat(state.self_out))
-    #S.append(list_to_mat(state.up_out))
-    #S.append(list_to_mat(state.down_out))
-    #S.append(list_to_mat(state.other_hand))
+    S.append(list_to_mat(state.self_out))
+    S.append(list_to_mat(state.up_out))
+    S.append(list_to_mat(state.down_out))
+    S.append(list_to_mat(state.other_hand))
     S.append(list_to_mat(state.last_move))
     S.append(list_to_mat([4]*13+[1,1]))
     S = np.array(S).transpose([1,2,0])
@@ -101,7 +101,7 @@ class ReplayBufferHER():
         self.round_exp = []
 
 class DQNModel():
-    def __init__(self, epsilon=1.0, min_epsilon = 0.02, epsilon_decay=0.99, gamma=0.95, buf_size=10000, step_per_update = 10, weight_blend = 0.8):
+    def __init__(self, state_shape, epsilon=1.0, min_epsilon = 0.02, epsilon_decay=0.99, gamma=0.95, buf_size=10000, step_per_update = 10, weight_blend = 0.8):
         self.buf = ReplayBuffer(buf_size)
         self.use_HER = False
         self.max_epsilon = self.epsilon = epsilon
@@ -112,12 +112,13 @@ class DQNModel():
         self.step_per_update = step_per_update
         self.weight_blend = weight_blend
         self.__J = 0
-
+        self.state_shape = state_shape
+        
     def __build_model(self):
         def bottleneck(inp, channels, use_shortcut = False):
             in_shape = KTF.int_shape(inp)
-            conv1 = Conv2D(channels, (2,2), activation='relu', padding='same')(inp)
-            conv2 = Conv2D(channels, (2,2), activation='relu', padding='same')(conv1)
+            conv1 = Conv2D(channels, (3,3), activation='relu', padding='same')(inp)
+            conv2 = Conv2D(channels, (3,3), activation='relu', padding='same')(conv1)
             if use_shortcut:
                 shortcut = inp
                 if in_shape[3]!=channels:
@@ -125,9 +126,8 @@ class DQNModel():
                 plus = Add()([conv2, shortcut])
                 return Activation('relu')(plus)
             return conv2
-
         def build_net(use_HER):
-            state_in = Input(shape=(15, 4, 4))
+            state_in = Input(shape=self.state_shape)
             action_in = Input(shape=(15, 4))
             action = Reshape((15, 4, 1))(action_in)
             if use_HER:
@@ -139,15 +139,14 @@ class DQNModel():
                 In = Concatenate()([state_in, action])
                 inputs = [state_in, action_in]
 
-            conv1 = Conv2D(256, (1,1), strides=(1,4))(In)
-            conv2 = Conv2D(256, (1,2), strides=(1,4))(In)
-            conv3 = Conv2D(256, (1,3), strides=(1,4))(In)
-            conv4 = Conv2D(256, (1,4), strides=(1,4))(In)
-            conca = Concatenate(axis=-2)([conv1, conv2, conv3, conv4])
-            pool = MaxPool2D((1,4))(conca)
-            out = Flatten()(pool)
+            block1 = bottleneck(In, 64, True)
+            block2 = bottleneck(block1, 128, True)
+            block3 = bottleneck(block2, 256, True)
+            block4 = bottleneck(block3, 256, True)
+            avp = MaxPooling2D((15,4))(block4)
+            out = Flatten()(avp)
+            out = Dense(1000, activation='relu')(out)
             out = Dropout(0.5)(out)
-            out = Dense(256)(out)
             out = Dense(1)(out)
             m = Model(inputs=inputs, outputs=[out])
             return m
@@ -176,18 +175,22 @@ class DQNModel():
         self.__J+=1
         if self.__J>=self.step_per_update:
             self.__J = 0
-            #self.tnet.set_weights( (1-self.weight_blend)*self.tnet.get_weights() + self.weight_blend*self.qnet.get_weights() )
             self.tnet.set_weights(self.qnet.get_weights())
-            #if self.epsilon>self.min_epsilon:
-            #    self.epsilon*=self.epsilon_decay
 
     def update_epsilon(self, episode, max_episode):
         if self.epsilon>self.min_epsilon:
             self.epsilon = self.max_epsilon - 3*(self.max_epsilon-self.min_epsilon)/max_episode * episode
 
-    def save(self):
-        self.qnet.save('qnet.h5')
-        pkl.dump({'epsilon':self.epsilon},open('config.pkl', 'wb'))
+    def save(self, filename=None):
+        if filename is None:
+            filename = 'qnet.h5'
+        self.qnet.save(filename)
+
+    def load(self, filename=None):
+        if filename is None:
+            filename = 'qnet.h5'
+        self.qnet = load_model(filename)
+        self.tnet.set_weights(self.qnet.get_weights())
 
 class DQNAgent(Agent):
     def __init__(self, player_id, rl_model):
@@ -199,10 +202,7 @@ class DQNAgent(Agent):
         res = self.model.choose_action(state_to_tensor(state), move_list)
         if os.path.exists( os.path.join(os.path.dirname(os.path.dirname(__file__)), 'test')):
             # player i [手牌] // [出牌]
-            hand_card = []
-            for i, n in enumerate(Card.all_card_name):
-                hand_card.extend([n]*self.get_hand_card()[i])
-            print("DQN Player {}".format(self.player_id), ' ', hand_card, ' // ', Card.visual_card(res))
+            print("DQN Player {}".format(self.player_id), ' ', Card.visual_card(self.get_hand_card()), ' // ', Card.visual_card(res))
 
         return res, None
 
