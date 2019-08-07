@@ -24,6 +24,7 @@ class GameState():
         self.last_pid = -1 # 上一个有效出牌的玩家编号，-1表示主动权
         self.last_move_ = np.zeros(15, dtype=int)  # 上一个出牌，不管有效与否
         self.last_last_move_ = np.zeros(15, dtype=int) # 上上个出牌，不管有效与否
+        self.player_role = -1 # 当前玩家编号，-1表示主动权
 
 class Game(object):
     def __init__(self, agents: List['Agent']):
@@ -43,6 +44,7 @@ class Game(object):
         state.other_hand = (np.array([4]*13+[1,1]) - state.hand - state.out).tolist()
         state.last_move = self.last_move.copy()
         state.last_pid = self.last_pid
+        state.player_role = self.index
         if len(self.cards_out)>=1:
             self.last_move_ = self.cards_out[-1][-1].copy()
         if len(self.cards_out)>=2:
